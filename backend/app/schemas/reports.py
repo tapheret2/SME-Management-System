@@ -1,38 +1,48 @@
-from pydantic import BaseModel
-from typing import Optional
-from datetime import datetime, date
+"""Report schemas with UUID support."""
+from datetime import date
 from decimal import Decimal
+from uuid import UUID
+from pydantic import BaseModel
 
 
-class RevenueData(BaseModel):
-    period: str  # date string or week/month identifier
+class DashboardMetrics(BaseModel):
+    today_revenue: Decimal
+    today_orders: int
+    month_revenue: Decimal
+    month_orders: int
+    total_receivables: Decimal
+    total_payables: Decimal
+    total_customers: int
+    total_products: int
+    low_stock_count: int
+
+
+class RevenueDataPoint(BaseModel):
+    period: str
     revenue: Decimal
     order_count: int
 
 
 class RevenueReport(BaseModel):
-    data: list[RevenueData]
+    data: list[RevenueDataPoint]
     total_revenue: Decimal
     total_orders: int
-    period_type: str  # "day", "week", "month"
 
 
-class TopProduct(BaseModel):
-    product_id: int
+class TopProductItem(BaseModel):
+    product_id: UUID
     product_sku: str
     product_name: str
-    total_quantity: int
+    quantity_sold: int
     total_revenue: Decimal
 
 
 class TopProductsReport(BaseModel):
-    data: list[TopProduct]
-    period_start: date
-    period_end: date
+    data: list[TopProductItem]
 
 
-class InventoryValuation(BaseModel):
-    product_id: int
+class InventoryItem(BaseModel):
+    product_id: UUID
     product_sku: str
     product_name: str
     current_stock: int
@@ -41,25 +51,12 @@ class InventoryValuation(BaseModel):
 
 
 class InventoryValuationReport(BaseModel):
-    data: list[InventoryValuation]
+    data: list[InventoryItem]
     total_value: Decimal
 
 
 class ARAPSummary(BaseModel):
-    total_receivables: Decimal  # Money customers owe us
-    total_payables: Decimal     # Money we owe suppliers
-    net_position: Decimal       # receivables - payables
-    customer_count: int
-    supplier_count: int
-
-
-class DashboardMetrics(BaseModel):
-    today_revenue: Decimal
-    today_orders: int
-    month_revenue: Decimal
-    month_orders: int
-    total_customers: int
-    total_products: int
-    low_stock_count: int
     total_receivables: Decimal
+    customer_count: int
     total_payables: Decimal
+    supplier_count: int

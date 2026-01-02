@@ -1,40 +1,43 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+"""User schemas with UUID support."""
 from datetime import datetime
-from app.models.user import UserRole
+from uuid import UUID
+from typing import Optional
+from pydantic import BaseModel, EmailStr, Field
 
 
-# Base schemas
 class UserBase(BaseModel):
     email: EmailStr
     full_name: str = Field(..., min_length=1, max_length=255)
-    role: UserRole = UserRole.STAFF
+    role: str = Field(default="staff", pattern="^(admin|manager|staff)$")
 
 
 class UserCreate(UserBase):
-    password: str = Field(..., min_length=8, max_length=100)
+    password: str = Field(..., min_length=6)
 
 
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     full_name: Optional[str] = Field(None, min_length=1, max_length=255)
-    role: Optional[UserRole] = None
+    role: Optional[str] = Field(None, pattern="^(admin|manager|staff)$")
+    password: Optional[str] = Field(None, min_length=6)
     is_active: Optional[bool] = None
-    password: Optional[str] = Field(None, min_length=8, max_length=100)
 
 
-class UserResponse(UserBase):
-    id: int
+class UserResponse(BaseModel):
+    id: UUID
+    email: str
+    full_name: str
+    role: str
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    
+    model_config = {"from_attributes": True}
 
-    class Config:
-        from_attributes = True
 
-
-class UserInDB(UserResponse):
-    hashed_password: str
+class UserListResponse(BaseModel):
+    items: list[UserResponse]
+    total: int
 
 
 # Auth schemas
@@ -44,17 +47,10 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
-class TokenPayload(BaseModel):
-    sub: int  # user_id
-    role: str
-    exp: datetime
-    type: str  # "access" or "refresh"
+class TokenRefresh(BaseModel):
+    refresh_token: str
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
-
-
-class RefreshRequest(BaseModel):
-    refresh_token: str

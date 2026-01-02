@@ -1,55 +1,55 @@
-from pydantic import BaseModel, Field
-from typing import Optional
+"""Payment schemas with UUID support."""
 from datetime import datetime
 from decimal import Decimal
-from app.models.payment import PaymentType, PaymentMethod
+from uuid import UUID
+from typing import Optional
+from pydantic import BaseModel, Field
 
 
-class PaymentBase(BaseModel):
-    type: PaymentType
-    method: PaymentMethod = PaymentMethod.CASH
+class PaymentCreate(BaseModel):
+    type: str = Field(..., pattern="^(incoming|outgoing)$")
+    method: str = Field(default="cash", pattern="^(cash|bank|other)$")
+    customer_id: Optional[UUID] = None
+    supplier_id: Optional[UUID] = None
+    order_id: Optional[UUID] = None
     amount: Decimal = Field(..., gt=0)
-    customer_id: Optional[int] = None
-    supplier_id: Optional[int] = None
-    order_id: Optional[int] = None
     notes: Optional[str] = None
-    payment_date: Optional[datetime] = None
-
-
-class PaymentCreate(PaymentBase):
-    pass
 
 
 class PaymentUpdate(BaseModel):
-    method: Optional[PaymentMethod] = None
+    method: Optional[str] = Field(None, pattern="^(cash|bank|other)$")
     amount: Optional[Decimal] = Field(None, gt=0)
     notes: Optional[str] = None
-    payment_date: Optional[datetime] = None
 
 
-class PaymentResponse(PaymentBase):
-    id: int
+class PaymentResponse(BaseModel):
+    id: UUID
     payment_number: str
+    type: str
+    method: str
+    customer_id: Optional[UUID] = None
     customer_name: Optional[str] = None
+    supplier_id: Optional[UUID] = None
     supplier_name: Optional[str] = None
-    order_number: Optional[str] = None
-    created_by: int
-    creator_name: Optional[str] = None
+    order_id: Optional[UUID] = None
+    created_by: UUID
+    amount: Decimal
+    notes: Optional[str] = None
+    payment_date: datetime
     created_at: datetime
-
-    class Config:
-        from_attributes = True
+    updated_at: datetime
+    
+    model_config = {"from_attributes": True}
 
 
 class PaymentListResponse(BaseModel):
     items: list[PaymentResponse]
     total: int
-    page: int
-    size: int
 
 
-class DebtSummary(BaseModel):
-    entity_id: int
+# AR/AP Summaries
+class DebtSummaryItem(BaseModel):
+    entity_id: UUID
     entity_code: str
     entity_name: str
     total_amount: Decimal
@@ -58,10 +58,10 @@ class DebtSummary(BaseModel):
 
 
 class ReceivablesResponse(BaseModel):
-    items: list[DebtSummary]
+    items: list[DebtSummaryItem]
     total_receivables: Decimal
 
 
 class PayablesResponse(BaseModel):
-    items: list[DebtSummary]
+    items: list[DebtSummaryItem]
     total_payables: Decimal

@@ -1,13 +1,18 @@
-from sqlalchemy import Column, Integer, String, Text, Numeric, DateTime, ForeignKey, Enum as SQLEnum
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from app.database import Base
+"""Payment model."""
 import enum
+from datetime import datetime
+from sqlalchemy import Column, String, Text, Numeric, Enum, ForeignKey, Index, DateTime
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from decimal import Decimal
+
+from app.database import Base
+from app.models.base import UUIDMixin, TimestampMixin
 
 
 class PaymentType(str, enum.Enum):
-    INCOMING = "incoming"  # From customer
-    OUTGOING = "outgoing"  # To supplier
+    INCOMING = "incoming"  # From customer (收款)
+    OUTGOING = "outgoing"  # To supplier (付款)
 
 
 class PaymentMethod(str, enum.Enum):
@@ -16,36 +21,33 @@ class PaymentMethod(str, enum.Enum):
     OTHER = "other"
 
 
-class Payment(Base):
+class Payment(Base, UUIDMixin, TimestampMixin):
+    """Payment model for tracking AR/AP."""
     __tablename__ = "payments"
     
-    id = Column(Integer, primary_key=True, index=True)
     payment_number = Column(String(50), unique=True, index=True, nullable=False)
-    
-    # Type
-    type = Column(SQLEnum(PaymentType), nullable=False)
-    method = Column(SQLEnum(PaymentMethod), default=PaymentMethod.CASH, nullable=False)
-    
-    # Relations (one of customer_id or supplier_id should be set)
-    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
-    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
-    order_id = Column(Integer, ForeignKey("sales_orders.id"), nullable=True)
-    
-    # Amount (VND)
+    type = Column(Enum(PaymentType), nullable=False)
+    method = Column(Enum(PaymentMethod), default=PaymentMethod.CASH, nullable=False)
+    customer_id = Column(UUID(as_uuid=True), ForeignKey("customers.id"), nullable=True)
+    supplier_id = Column(UUID(as_uuid=True), ForeignKey("suppliers.id"), nullable=True)
+    order_id = Column(UUID(as_uuid=True), ForeignKey("sales_orders.id"), nullable=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     amount = Column(Numeric(15, 0), nullable=False)
-    
     notes = Column(Text, nullable=True)
-    payment_date = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    
-    # Audit
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    payment_date = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     
     # Relationships
-    customer = relationship("Customer", backref="payments")
-    supplier = relationship("Supplier", backref="payments")
-    order = relationship("SalesOrder", backref="payments")
-    creator = relationship("User", backref="created_payments")
+    customer = relationship("Customer", back_populates="payments")
+    supplier = relationship("Supplier", back_populates="payments")
+    order = relationship("SalesOrder", back_populates="payments")
+    creator = relationship("User", back_populates="payments", foreign_keys=[created_by])
+    
+    __table_args__ = (
+        Index("idx_payments_payment_date", "payment_date"),
+        Index("idx_payments_type", "type"),
+        Index("idx_payments_customer_id", "customer_id"),
+        Index("idx_payments_supplier_id", "supplier_id"),
+    )
     
     def __repr__(self):
-        return f"<Payment {self.payment_number} {self.type.value}>"
+        return f"<Payment {self.payment_number} {self.type.value} {self.amount}>"

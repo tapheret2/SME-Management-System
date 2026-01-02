@@ -1,8 +1,13 @@
-from sqlalchemy import Column, Integer, String, Text, Numeric, DateTime, ForeignKey, Enum as SQLEnum
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from app.database import Base
+"""Sales Order and Order Item models."""
 import enum
+from datetime import datetime
+from sqlalchemy import Column, String, Integer, Text, Numeric, Enum, ForeignKey, Index, DateTime
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from decimal import Decimal
+
+from app.database import Base
+from app.models.base import UUIDMixin, TimestampMixin, SoftDeleteMixin
 
 
 class OrderStatus(str, enum.Enum):
@@ -13,60 +18,86 @@ class OrderStatus(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
-class SalesOrder(Base):
+# Valid status transitions
+STATUS_TRANSITIONS = {
+    OrderStatus.DRAFT: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
+    OrderStatus.CONFIRMED: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+    OrderStatus.SHIPPED: [OrderStatus.COMPLETED],
+    OrderStatus.COMPLETED: [],
+    OrderStatus.CANCELLED: [],
+}
+
+
+class SalesOrder(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
+    """Sales order model with soft delete support."""
     __tablename__ = "sales_orders"
     
-    id = Column(Integer, primary_key=True, index=True)
     order_number = Column(String(50), unique=True, index=True, nullable=False)
-    
-    # Relations
-    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    
-    # Status
-    status = Column(SQLEnum(OrderStatus), default=OrderStatus.DRAFT, nullable=False)
-    
-    # Amounts (VND)
-    subtotal = Column(Numeric(15, 0), default=0, nullable=False)
-    discount = Column(Numeric(15, 0), default=0, nullable=False)
-    total = Column(Numeric(15, 0), default=0, nullable=False)
-    paid_amount = Column(Numeric(15, 0), default=0, nullable=False)
-    
+    customer_id = Column(UUID(as_uuid=True), ForeignKey("customers.id"), nullable=False)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    status = Column(Enum(OrderStatus), default=OrderStatus.DRAFT, nullable=False)
+    subtotal = Column(Numeric(15, 0), default=Decimal("0"), nullable=False)
+    discount = Column(Numeric(15, 0), default=Decimal("0"), nullable=False)
+    total = Column(Numeric(15, 0), default=Decimal("0"), nullable=False)
+    paid_amount = Column(Numeric(15, 0), default=Decimal("0"), nullable=False)
     notes = Column(Text, nullable=True)
-    order_date = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    order_date = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     
     # Relationships
-    customer = relationship("Customer", backref="orders")
-    creator = relationship("User", backref="created_orders")
-    line_items = relationship("OrderLine", back_populates="order", cascade="all, delete-orphan")
+    customer = relationship("Customer", back_populates="orders")
+    creator = relationship("User", back_populates="orders", foreign_keys=[created_by])
+    line_items = relationship("SalesOrderItem", back_populates="order", cascade="all, delete-orphan")
+    payments = relationship("Payment", back_populates="order")
+    stock_movements = relationship("StockMovement", back_populates="order")
+    
+    __table_args__ = (
+        Index("idx_sales_orders_order_date", "order_date"),
+        Index("idx_sales_orders_status", "status"),
+        Index("idx_sales_orders_customer_id", "customer_id"),
+        Index("idx_sales_orders_deleted_at", "deleted_at", postgresql_where=("deleted_at IS NULL")),
+    )
     
     @property
-    def remaining_amount(self) -> int:
-        return int(self.total) - int(self.paid_amount)
+    def remaining_amount(self) -> Decimal:
+        """Calculate remaining amount to be paid."""
+        return self.total - self.paid_amount
+    
+    def can_transition_to(self, new_status: OrderStatus) -> bool:
+        """Check if status transition is valid."""
+        return new_status in STATUS_TRANSITIONS.get(self.status, [])
+    
+    def calculate_totals(self):
+        """Recalculate order totals from line items."""
+        self.subtotal = sum(item.line_total for item in self.line_items)
+        self.total = self.subtotal - self.discount
     
     def __repr__(self):
         return f"<SalesOrder {self.order_number}>"
 
 
-class OrderLine(Base):
-    __tablename__ = "order_lines"
+class SalesOrderItem(Base, UUIDMixin, TimestampMixin):
+    """Order line item model."""
+    __tablename__ = "sales_order_items"
     
-    id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(Integer, ForeignKey("sales_orders.id", ondelete="CASCADE"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    
+    order_id = Column(UUID(as_uuid=True), ForeignKey("sales_orders.id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
     quantity = Column(Integer, nullable=False)
     unit_price = Column(Numeric(15, 0), nullable=False)
-    discount = Column(Numeric(15, 0), default=0, nullable=False)
+    discount = Column(Numeric(15, 0), default=Decimal("0"), nullable=False)
     line_total = Column(Numeric(15, 0), nullable=False)
     
     # Relationships
     order = relationship("SalesOrder", back_populates="line_items")
-    product = relationship("Product", backref="order_lines")
+    product = relationship("Product", back_populates="order_items")
+    
+    __table_args__ = (
+        Index("idx_order_items_order_id", "order_id"),
+        Index("idx_order_items_product_id", "product_id"),
+    )
+    
+    def calculate_total(self):
+        """Calculate line total."""
+        self.line_total = (self.unit_price * self.quantity) - self.discount
     
     def __repr__(self):
-        return f"<OrderLine order={self.order_id} product={self.product_id}>"
+        return f"<SalesOrderItem order={self.order_id} product={self.product_id}>"

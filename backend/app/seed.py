@@ -2,6 +2,7 @@
 Seed script to create demo data for testing.
 Run with: python -m app.seed
 """
+import uuid
 from sqlalchemy.orm import Session
 from app.database import SessionLocal, engine, Base
 from app.models.user import User, UserRole
@@ -26,6 +27,7 @@ def seed_users(db: Session):
         existing = db.query(User).filter(User.email == user_data["email"]).first()
         if not existing:
             user = User(
+                id=uuid.uuid4(),
                 email=user_data["email"],
                 hashed_password=hash_password(user_data["password"]),
                 full_name=user_data["full_name"],
@@ -50,7 +52,7 @@ def seed_customers(db: Session):
     for data in customers:
         existing = db.query(Customer).filter(Customer.code == data["code"]).first()
         if not existing:
-            customer = Customer(**data)
+            customer = Customer(id=uuid.uuid4(), **data)
             db.add(customer)
             print(f"Created customer: {data['code']}")
     
@@ -68,7 +70,7 @@ def seed_suppliers(db: Session):
     for data in suppliers:
         existing = db.query(Supplier).filter(Supplier.code == data["code"]).first()
         if not existing:
-            supplier = Supplier(**data)
+            supplier = Supplier(id=uuid.uuid4(), **data)
             db.add(supplier)
             print(f"Created supplier: {data['code']}")
     
@@ -93,7 +95,7 @@ def seed_products(db: Session):
     for data in products:
         existing = db.query(Product).filter(Product.sku == data["sku"]).first()
         if not existing:
-            product = Product(**data)
+            product = Product(id=uuid.uuid4(), **data)
             db.add(product)
             print(f"Created product: {data['sku']}")
     

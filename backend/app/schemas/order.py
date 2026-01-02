@@ -1,20 +1,16 @@
-from pydantic import BaseModel, Field
-from typing import Optional
+"""Order schemas with UUID support."""
 from datetime import datetime
 from decimal import Decimal
-from app.models.order import OrderStatus
+from uuid import UUID
+from typing import Optional
+from pydantic import BaseModel, Field
 
 
-# Order Line schemas
-class OrderLineBase(BaseModel):
-    product_id: int
+class OrderLineCreate(BaseModel):
+    product_id: UUID
     quantity: int = Field(..., gt=0)
     unit_price: Decimal = Field(..., ge=0)
-    discount: Decimal = Field(default=0, ge=0)
-
-
-class OrderLineCreate(OrderLineBase):
-    pass
+    discount: Decimal = Field(default=Decimal("0"), ge=0)
 
 
 class OrderLineUpdate(BaseModel):
@@ -23,46 +19,46 @@ class OrderLineUpdate(BaseModel):
     discount: Optional[Decimal] = Field(None, ge=0)
 
 
-class OrderLineResponse(OrderLineBase):
-    id: int
-    line_total: Decimal
-    product_name: Optional[str] = None
+class OrderLineResponse(BaseModel):
+    id: UUID
+    order_id: UUID
+    product_id: UUID
     product_sku: Optional[str] = None
+    product_name: Optional[str] = None
+    quantity: int
+    unit_price: Decimal
+    discount: Decimal
+    line_total: Decimal
+    created_at: datetime
+    updated_at: datetime
+    
+    model_config = {"from_attributes": True}
 
-    class Config:
-        from_attributes = True
 
-
-# Order schemas
-class OrderBase(BaseModel):
-    customer_id: int
+class OrderCreate(BaseModel):
+    customer_id: UUID
+    line_items: list[OrderLineCreate]
+    discount: Decimal = Field(default=Decimal("0"), ge=0)
     notes: Optional[str] = None
-    order_date: Optional[datetime] = None
-
-
-class OrderCreate(OrderBase):
-    line_items: list[OrderLineCreate] = Field(default_factory=list)
-    discount: Decimal = Field(default=0, ge=0)
 
 
 class OrderUpdate(BaseModel):
-    customer_id: Optional[int] = None
-    notes: Optional[str] = None
     discount: Optional[Decimal] = Field(None, ge=0)
+    notes: Optional[str] = None
 
 
 class OrderStatusUpdate(BaseModel):
-    status: OrderStatus
+    status: str = Field(..., pattern="^(draft|confirmed|shipped|completed|cancelled)$")
 
 
 class OrderResponse(BaseModel):
-    id: int
+    id: UUID
     order_number: str
-    customer_id: int
+    customer_id: UUID
     customer_name: Optional[str] = None
-    created_by: int
+    created_by: UUID
     creator_name: Optional[str] = None
-    status: OrderStatus
+    status: str
     subtotal: Decimal
     discount: Decimal
     total: Decimal
@@ -70,16 +66,29 @@ class OrderResponse(BaseModel):
     remaining_amount: Decimal
     notes: Optional[str] = None
     order_date: datetime
+    line_items: list[OrderLineResponse] = []
     created_at: datetime
     updated_at: datetime
-    line_items: list[OrderLineResponse] = Field(default_factory=list)
+    deleted_at: Optional[datetime] = None
+    
+    model_config = {"from_attributes": True}
 
-    class Config:
-        from_attributes = True
+
+class OrderListItem(BaseModel):
+    id: UUID
+    order_number: str
+    customer_id: UUID
+    customer_name: Optional[str] = None
+    status: str
+    total: Decimal
+    paid_amount: Decimal
+    remaining_amount: Decimal
+    order_date: datetime
+    created_at: datetime
+    
+    model_config = {"from_attributes": True}
 
 
 class OrderListResponse(BaseModel):
-    items: list[OrderResponse]
+    items: list[OrderListItem]
     total: int
-    page: int
-    size: int
