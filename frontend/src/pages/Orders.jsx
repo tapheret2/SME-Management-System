@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { getOrders, createOrder, updateOrderStatus } from '../api/orders';
+import { getErrorMessage } from '../utils/errors';
+import { cleanFormData } from '../utils/form';
 import { getCustomers } from '../api/customers';
 import { getProducts } from '../api/products';
 import { format } from 'date-fns';
@@ -57,7 +59,7 @@ export default function Orders() {
             setIsModalOpen(false);
             setNewOrder({ customer_id: '', line_items: [], discount: 0 });
         },
-        onError: (error) => toast.error(error.response?.data?.detail || 'Có lỗi xảy ra'),
+        onError: (error) => toast.error(getErrorMessage(error, 'Có lỗi xảy ra')),
     });
 
     const statusMutation = useMutation({
@@ -66,7 +68,7 @@ export default function Orders() {
             queryClient.invalidateQueries({ queryKey: ['orders'] });
             toast.success('Cập nhật trạng thái thành công!');
         },
-        onError: (error) => toast.error(error.response?.data?.detail || 'Không thể cập nhật'),
+        onError: (error) => toast.error(getErrorMessage(error, 'Không thể cập nhật')),
     });
 
     const addLineItem = () => {
@@ -99,20 +101,27 @@ export default function Orders() {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!newOrder.customer_id || newOrder.line_items.length === 0) {
+
+        // Clean the input data first (convert empty strings to null)
+        const cleanedOrder = cleanFormData(newOrder);
+
+        if (!cleanedOrder.customer_id || newOrder.line_items.length === 0) {
             toast.error('Vui lòng chọn khách hàng và thêm sản phẩm');
             return;
         }
-        createMutation.mutate({
-            customer_id: Number(newOrder.customer_id),
-            discount: Number(newOrder.discount),
+
+        const payload = {
+            customer_id: Number(cleanedOrder.customer_id),
+            discount: Number(cleanedOrder.discount || 0),
             line_items: newOrder.line_items.map(item => ({
                 product_id: Number(item.product_id),
                 quantity: Number(item.quantity),
                 unit_price: Number(item.unit_price),
                 discount: Number(item.discount || 0)
             }))
-        });
+        };
+
+        createMutation.mutate(payload);
     };
 
     const getNextStatus = (currentStatus) => {

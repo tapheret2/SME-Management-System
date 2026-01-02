@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { getCustomers, createCustomer, updateCustomer, deleteCustomer } from '../api/customers';
+import { getErrorMessage } from '../utils/errors';
+import { cleanFormData } from '../utils/form';
 
 function formatVND(value) {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
@@ -29,7 +31,7 @@ export default function Customers() {
             toast.success('Tạo khách hàng thành công!');
             closeModal();
         },
-        onError: (error) => toast.error(error.response?.data?.detail || 'Có lỗi xảy ra'),
+        onError: (error) => toast.error(getErrorMessage(error, 'Không thể tạo khách hàng')),
     });
 
     const updateMutation = useMutation({
@@ -39,7 +41,7 @@ export default function Customers() {
             toast.success('Cập nhật thành công!');
             closeModal();
         },
-        onError: (error) => toast.error(error.response?.data?.detail || 'Có lỗi xảy ra'),
+        onError: (error) => toast.error(getErrorMessage(error, 'Không thể cập nhật')),
     });
 
     const deleteMutation = useMutation({
@@ -48,7 +50,7 @@ export default function Customers() {
             queryClient.invalidateQueries({ queryKey: ['customers'] });
             toast.success('Xóa thành công!');
         },
-        onError: (error) => toast.error(error.response?.data?.detail || 'Không thể xóa'),
+        onError: (error) => toast.error(getErrorMessage(error, 'Không thể xóa')),
     });
 
     const openModal = (item = null) => {
@@ -64,10 +66,11 @@ export default function Customers() {
     };
 
     const onSubmit = (formData) => {
+        const cleanedData = cleanFormData(formData);
         if (editingItem) {
-            updateMutation.mutate({ id: editingItem.id, data: formData });
+            updateMutation.mutate({ id: editingItem.id, data: cleanedData });
         } else {
-            createMutation.mutate(formData);
+            createMutation.mutate(cleanedData);
         }
     };
 

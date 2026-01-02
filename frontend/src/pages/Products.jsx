@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { getProducts, createProduct, updateProduct, deleteProduct } from '../api/products';
+import { getErrorMessage } from '../utils/errors';
+import { cleanFormData } from '../utils/form';
 
 function formatVND(value) {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
@@ -30,7 +32,7 @@ export default function Products() {
             closeModal();
         },
         onError: (error) => {
-            toast.error(error.response?.data?.detail || 'Có lỗi xảy ra');
+            toast.error(getErrorMessage(error, 'Có lỗi xảy ra'));
         },
     });
 
@@ -42,7 +44,7 @@ export default function Products() {
             closeModal();
         },
         onError: (error) => {
-            toast.error(error.response?.data?.detail || 'Có lỗi xảy ra');
+            toast.error(getErrorMessage(error, 'Có lỗi xảy ra'));
         },
     });
 
@@ -71,13 +73,13 @@ export default function Products() {
     };
 
     const onSubmit = (formData) => {
-        const data = {
+        const data = cleanFormData({
             ...formData,
             cost_price: Number(formData.cost_price),
             sell_price: Number(formData.sell_price),
             min_stock: Number(formData.min_stock),
             current_stock: Number(formData.current_stock || 0),
-        };
+        });
 
         if (editingProduct) {
             updateMutation.mutate({ id: editingProduct.id, data });

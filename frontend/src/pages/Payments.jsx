@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { getPayments, createPayment, getReceivables, getPayables } from '../api/payments';
+import { getErrorMessage } from '../utils/errors';
 import { getCustomers } from '../api/customers';
 import { getSuppliers } from '../api/suppliers';
 import { format } from 'date-fns';
@@ -60,7 +61,7 @@ export default function Payments() {
             toast.success('Tạo phiếu thanh toán thành công!');
             closeModal();
         },
-        onError: (error) => toast.error(error.response?.data?.detail || 'Có lỗi xảy ra'),
+        onError: (error) => toast.error(getErrorMessage(error, 'Có lỗi xảy ra')),
     });
 
     const openModal = () => {
@@ -110,8 +111,8 @@ export default function Payments() {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
-                                    ? 'border-primary-500 text-primary-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                                ? 'border-primary-500 text-primary-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
                                 }`}
                         >
                             {tab.label}

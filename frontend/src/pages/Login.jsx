@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import { getErrorMessage } from '../utils/errors';
 
 export default function Login() {
     const [loading, setLoading] = useState(false);
