@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { getErrorMessage } from '../utils/errors';
+import { toDisplayMessage } from '../utils/toDisplayMessage';
 
 export default function Login() {
     const [loading, setLoading] = useState(false);
@@ -16,27 +16,7 @@ export default function Login() {
             toast.success('Đăng nhập thành công!');
         } catch (error) {
             console.error('Login error:', error);
-            const detail = error.response?.data?.detail;
-            let message = 'Email hoặc mật khẩu không đúng';
-
-            if (typeof detail === 'string') {
-                message = detail;
-            } else if (Array.isArray(detail)) {
-                if (detail.length > 0) {
-                    const firstError = detail[0];
-                    if (typeof firstError === 'string') {
-                        message = firstError;
-                    } else if (typeof firstError === 'object' && firstError !== null) {
-                        message = String(firstError.msg || firstError.message || JSON.stringify(firstError));
-                    }
-                }
-            } else if (typeof detail === 'object' && detail !== null) {
-                message = String(detail.msg || detail.message || JSON.stringify(detail));
-            }
-
-            // Final failsafe
-            if (typeof message !== 'string') message = 'Lỗi không xác định';
-
+            const message = toDisplayMessage(error);
             toast.error(message);
         } finally {
             setLoading(false);
