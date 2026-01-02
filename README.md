@@ -1,164 +1,233 @@
 # SME Management System
 
-Hệ thống quản lý nội bộ cho doanh nghiệp SME Việt Nam - Quản lý Đơn hàng, Tồn kho, Khách hàng, Nhà cung cấp, Thanh toán/Công nợ và Báo cáo.
+> Complete inventory, orders, and payment management for small & medium enterprises.
+
+![Dashboard Screenshot](docs/screenshots/dashboard.png)
+*Screenshot: Dashboard with real-time KPIs*
+
+---
+
+## 🎯 Features
+
+| Module | Capabilities |
+|--------|-------------|
+| **Products** | SKU management, categories, cost/sell pricing, low-stock alerts |
+| **Inventory** | Stock in/out/adjust movements, audit trail |
+| **Orders** | Draft → Confirmed → Shipped → Completed workflow, auto stock deduction |
+| **Payments** | Incoming (AR) and outgoing (AP), order linking |
+| **Reports** | Dashboard KPIs, revenue charts, top products |
+| **Export** | CSV export for products, orders, payments |
+| **Audit** | Full action log with before/after snapshots |
+| **Security** | JWT authentication, role-based access (Admin/Manager/Staff) |
+
+---
+
+## 📸 Screenshots
+
+| Dashboard | Orders | Products |
+|-----------|--------|----------|
+| ![Dashboard](docs/screenshots/dashboard_thumb.png) | ![Orders](docs/screenshots/orders_thumb.png) | ![Products](docs/screenshots/products_thumb.png) |
+
+---
 
 ## 🚀 Quick Start
 
-### Yêu cầu
-
+### Prerequisites
 - Docker & Docker Compose
-- Node.js 18+ (nếu chạy frontend riêng)
-- Python 3.11+ (nếu chạy backend riêng)
+- Git
 
-### Chạy với Docker Compose
+### Installation
 
 ```bash
-# Clone repo và vào thư mục
-cd SME
+# Clone repository
+git clone https://github.com/your-org/sme-management.git
+cd sme-management
 
-# Copy file môi trường
+# Configure environment
 cp .env.example .env
+# Edit .env with your settings (especially JWT_SECRET_KEY for production)
 
-# Khởi động tất cả services
-docker compose up --build
+# Start services
+docker compose up -d
 
-# Chờ khoảng 1-2 phút để build xong
+# Load demo data (optional)
+docker compose exec api python -m app.demo_data
+
+# Access the application
+open http://localhost:5173  # Frontend
+open http://localhost:8000/docs  # API Documentation
 ```
 
-Sau khi chạy xong:
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+### Demo Accounts
 
-### Seed dữ liệu demo
-
-```bash
-# Chạy seed script trong container
-docker compose exec api python -m app.seed
-```
-
-### Tài khoản demo
-
-| Vai trò | Email | Mật khẩu |
-|---------|-------|----------|
+| Role | Email | Password |
+|------|-------|----------|
 | Admin | admin@sme.local | Admin123! |
 | Manager | manager@sme.local | Manager123! |
 | Staff | staff@sme.local | Staff123! |
 
-## 📁 Project Structure
+---
+
+## 🏗️ Architecture
 
 ```
-SME/
-├── backend/           # FastAPI backend
-│   ├── app/
-│   │   ├── api/       # API routes
-│   │   ├── models/    # SQLAlchemy models
-│   │   ├── schemas/   # Pydantic schemas
-│   │   ├── services/  # Business logic
-│   │   └── utils/     # Utilities
-│   ├── alembic/       # DB migrations
-│   └── tests/         # pytest tests
-├── frontend/          # React + Vite frontend
-│   └── src/
-│       ├── api/       # API client
-│       ├── components/
-│       ├── pages/
-│       └── context/
-└── docker-compose.yml
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Frontend  │────▶│   Backend   │────▶│  PostgreSQL │
+│  (React)    │     │  (FastAPI)  │     │  Database   │
+│  Port 5173  │     │  Port 8000  │     │  Port 5432  │
+└─────────────┘     └─────────────┘     └─────────────┘
 ```
 
-## 🔧 Development
+### Tech Stack
+- **Backend**: Python 3.11, FastAPI, SQLAlchemy, Pydantic
+- **Frontend**: React, TanStack Query, Tailwind CSS
+- **Database**: PostgreSQL 16
+- **Auth**: JWT with refresh tokens
+- **Container**: Docker Compose
 
-### Chạy backend riêng
+---
+
+## 📋 API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/login` | Authenticate user |
+| GET | `/api/products` | List products |
+| POST | `/api/orders` | Create order |
+| PUT | `/api/orders/{id}/status` | Update order status |
+| GET | `/api/reports/dashboard` | Dashboard metrics |
+| GET | `/api/export/products.csv` | Export products |
+| GET | `/api/audit` | Audit logs (admin) |
+
+Full documentation at: `http://localhost:8000/docs`
+
+---
+
+## 🔐 Role-Based Access
+
+| Feature | Admin | Manager | Staff |
+|---------|:-----:|:-------:|:-----:|
+| View Dashboard | ✅ | ✅ | ✅ |
+| Manage Products | ✅ | ✅ | ✅ |
+| Create Orders | ✅ | ✅ | ✅ |
+| View Reports | ✅ | ✅ | ❌ |
+| Export Data | ✅ | ✅ | ❌ |
+| Manage Users | ✅ | ❌ | ❌ |
+| View Audit Logs | ✅ | ❌ | ❌ |
+
+### Frontend Role-Based UI Hiding
+
+The frontend should conditionally render UI elements based on user role:
+
+```javascript
+// Example: Hide admin-only features
+{user.role === 'admin' && <AuditLogLink />}
+{['admin', 'manager'].includes(user.role) && <ReportsMenu />}
+```
+
+---
+
+## 💾 Database Backup
+
+### Manual Backup
+```bash
+docker compose exec db pg_dump -U sme_user sme_db > backup_$(date +%Y%m%d).sql
+```
+
+### Restore
+```bash
+cat backup_20260103.sql | docker compose exec -T db psql -U sme_user sme_db
+```
+
+### Automated Backups (Recommended)
+Set up a cron job for daily backups:
+```bash
+0 2 * * * cd /path/to/project && docker compose exec -T db pg_dump -U sme_user sme_db | gzip > /backups/sme_$(date +\%Y\%m\%d).sql.gz
+```
+
+---
+
+## 🧪 Testing
 
 ```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+# Run all tests
+docker compose exec api pytest tests/ -v
 
-# Cần PostgreSQL đang chạy
-export DATABASE_URL="postgresql://user:pass@localhost:5432/sme_db"
-uvicorn app.main:app --reload
+# Run specific milestone tests
+docker compose exec api pytest tests/test_milestone1.py -v
+
+# Test coverage
+docker compose exec api pytest tests/ --cov=app --cov-report=html
 ```
 
-### Chạy frontend riêng
+**Current status**: 38 tests passing
 
+---
+
+## 📦 Deployment
+
+### Production Checklist
+- [ ] Set `DEBUG=false` in `.env`
+- [ ] Generate secure `JWT_SECRET_KEY` (min 32 chars)
+- [ ] Configure proper `CORS_ORIGINS`
+- [ ] Set up SSL/HTTPS (nginx reverse proxy)
+- [ ] Configure database backups
+- [ ] Set up monitoring/alerting
+
+### Docker Production Build
 ```bash
-cd frontend
-npm install
-npm run dev
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-### Chạy tests
+---
 
-```bash
-cd backend
-pytest tests/ -v
-```
+## 💼 Sales Pitch
 
-### Tạo migration mới
+### Pain Points Solved
 
-```bash
-docker compose exec api alembic revision --autogenerate -m "description"
-docker compose exec api alembic upgrade head
-```
+❌ **Before**: Messy Excel spreadsheets, lost orders, manual stock counts, no visibility into profits
 
-## 🔑 Features
+✅ **After**: Real-time inventory, automated order workflow, instant reports, complete audit trail
 
-### Quản lý người dùng (RBAC)
-- 3 vai trò: Admin, Manager, Staff
-- JWT authentication (access + refresh tokens)
+### Why Choose SME Management System?
 
-### Quản lý sản phẩm
-- CRUD sản phẩm với SKU, giá vốn, giá bán
-- Cảnh báo tồn kho thấp
+| Problem | Solution |
+|---------|----------|
+| Stock discrepancies | Automatic deduction on order confirmation |
+| Lost payment records | Linked payments with AR/AP tracking |
+| No order history | Complete order lifecycle with audit log |
+| Manual reporting | One-click dashboard & CSV exports |
+| Access control | Role-based permissions (Admin/Manager/Staff) |
 
-### Quản lý khách hàng/Nhà cung cấp
-- Thông tin liên hệ
-- Theo dõi công nợ
+### Key Features
+- ✅ **Order Workflow**: Draft → Confirm → Ship → Complete with auto stock updates
+- ✅ **Low Stock Alerts**: Never run out of bestsellers
+- ✅ **Payment Tracking**: Know exactly who owes what
+- ✅ **Audit Trail**: Full history of every change
+- ✅ **CSV Export**: Easy data for accountants
+- ✅ **Multi-user**: Team collaboration with role-based access
+- ✅ **Vietnamese-ready**: Supports VND currency, Vietnamese text
 
-### Quản lý đơn hàng
-- Quy trình: Nháp → Xác nhận → Giao hàng → Hoàn thành
-- Tự động trừ/cộng tồn kho
-- Quản lý chi tiết sản phẩm trong đơn
+### Pricing Suggestion
 
-### Xuất/Nhập kho
-- Nhập kho từ NCC
-- Xuất kho (bán hoặc thủ công)
-- Điều chỉnh tồn kho
+| Package | Price | Includes |
+|---------|-------|----------|
+| **Setup Fee** | $500 - $1,000 | Installation, configuration, training, 1-month support |
+| **Monthly Maintenance** | $50 - $100/month | Bug fixes, minor updates, email support |
+| **Custom Development** | $30 - $50/hour | New features, integrations, customizations |
 
-### Thanh toán & Công nợ
-- Phiếu thu (từ khách hàng)
-- Phiếu chi (cho nhà cung cấp)
-- Báo cáo AR/AP
+*For 1-3 users, simple deployment. Scale pricing for more users or advanced features.*
 
-### Báo cáo
-- Dashboard tổng quan
-- Biểu đồ doanh thu theo ngày/tuần/tháng
-- Top sản phẩm bán chạy
-- Giá trị tồn kho
-- Xuất CSV
+---
 
-## 📋 API Documentation
+## 📄 License
 
-Truy cập http://localhost:8000/docs để xem Swagger UI với đầy đủ API endpoints.
+MIT License - see [LICENSE](LICENSE) for details.
 
-### Main endpoints:
+---
 
-- `POST /api/auth/login` - Đăng nhập
-- `GET /api/products` - Danh sách sản phẩm
-- `GET /api/customers` - Danh sách khách hàng
-- `GET /api/suppliers` - Danh sách NCC
-- `GET /api/orders` - Danh sách đơn hàng
-- `GET /api/payments` - Danh sách thanh toán
-- `GET /api/stock` - Lịch sử xuất nhập kho
-- `GET /api/reports/dashboard` - Metrics dashboard
+## 🤝 Support
 
-## 🔒 Environment Variables
-
-Xem file `.env.example` để biết các biến môi trường cần thiết.
-
-## 📝 License
-
-MIT License
+- 📧 Email: support@yourcompany.com
+- 📖 Documentation: [docs/](docs/)
+- 🐛 Issues: [GitHub Issues](https://github.com/your-org/sme-management/issues)
