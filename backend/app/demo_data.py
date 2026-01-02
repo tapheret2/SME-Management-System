@@ -44,9 +44,9 @@ def load_demo_data():
         
         # Create demo users
         users = [
-            User(email="admin@sme.local", hashed_password=hash_password("Admin123!"), full_name="System Admin", role=UserRole.ADMIN),
-            User(email="manager@sme.local", hashed_password=hash_password("Manager123!"), full_name="Store Manager", role=UserRole.MANAGER),
-            User(email="staff@sme.local", hashed_password=hash_password("Staff123!"), full_name="Sales Staff", role=UserRole.STAFF),
+            User(email="admin@sme.com", hashed_password=hash_password("Admin123!"), full_name="System Admin", role=UserRole.ADMIN),
+            User(email="manager@sme.com", hashed_password=hash_password("Manager123!"), full_name="Store Manager", role=UserRole.MANAGER),
+            User(email="staff@sme.com", hashed_password=hash_password("Staff123!"), full_name="Sales Staff", role=UserRole.STAFF),
         ]
         db.add_all(users)
         
@@ -64,7 +64,7 @@ def load_demo_data():
         
         db.commit()
         print("✅ Demo data loaded successfully!")
-        print("   Users: admin@sme.local, manager@sme.local, staff@sme.local")
+        print("   Users: admin@sme.com, manager@sme.com, staff@sme.com")
         print("   Password: [Role]123! (e.g., Admin123!)")
         
     except Exception as e:

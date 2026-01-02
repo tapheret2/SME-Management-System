@@ -14,7 +14,29 @@ export default function Login() {
             await login(data.email, data.password);
             toast.success('Đăng nhập thành công!');
         } catch (error) {
-            toast.error(error.response?.data?.detail || 'Email hoặc mật khẩu không đúng');
+            console.error('Login error:', error);
+            const detail = error.response?.data?.detail;
+            let message = 'Email hoặc mật khẩu không đúng';
+
+            if (typeof detail === 'string') {
+                message = detail;
+            } else if (Array.isArray(detail)) {
+                if (detail.length > 0) {
+                    const firstError = detail[0];
+                    if (typeof firstError === 'string') {
+                        message = firstError;
+                    } else if (typeof firstError === 'object' && firstError !== null) {
+                        message = String(firstError.msg || firstError.message || JSON.stringify(firstError));
+                    }
+                }
+            } else if (typeof detail === 'object' && detail !== null) {
+                message = String(detail.msg || detail.message || JSON.stringify(detail));
+            }
+
+            // Final failsafe
+            if (typeof message !== 'string') message = 'Lỗi không xác định';
+
+            toast.error(message);
         } finally {
             setLoading(false);
         }
@@ -60,8 +82,12 @@ export default function Login() {
                                 {...register('password', {
                                     required: 'Vui lòng nhập mật khẩu',
                                     minLength: {
-                                        value: 6,
-                                        message: 'Mật khẩu phải có ít nhất 6 ký tự'
+                                        value: 8,
+                                        message: 'Mật khẩu phải có ít nhất 8 ký tự'
+                                    },
+                                    pattern: {
+                                        value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/,
+                                        message: 'Mật khẩu phải có chữ hoa, chữ thường và số'
                                     }
                                 })}
                                 className="form-input"

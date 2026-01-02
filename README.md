@@ -62,9 +62,9 @@ open http://localhost:8000/docs  # API Documentation
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | admin@sme.local | Admin123! |
-| Manager | manager@sme.local | Manager123! |
-| Staff | staff@sme.local | Staff123! |
+| Admin | admin@sme.com | Admin123! |
+| Manager | manager@sme.com | Manager123! |
+| Staff | staff@sme.com | Staff123! |
 
 ---
 
