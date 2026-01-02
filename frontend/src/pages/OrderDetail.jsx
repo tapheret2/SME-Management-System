@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { getOrder, updateOrderStatus } from '../api/orders';
-import { toDisplayMessage } from '../utils/toDisplayMessage';
+import { toDisplayMessage, warnIfNotRenderable } from '../utils/toDisplayMessage';
 import { format } from 'date-fns';
 
 function formatVND(value) {
@@ -41,7 +41,11 @@ export default function OrderDetail() {
             queryClient.invalidateQueries({ queryKey: ['order', id] });
             toast.success('Cập nhật trạng thái thành công!');
         },
-        onError: (error) => toast.error(toDisplayMessage(error)),
+        onError: (error) => {
+            const message = toDisplayMessage(error);
+            warnIfNotRenderable(message, 'orderDetail.updateStatus');
+            toast.error(message);
+        },
     });
 
     const getNextStatus = (currentStatus) => {

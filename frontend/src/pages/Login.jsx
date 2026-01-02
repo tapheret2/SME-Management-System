@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { toDisplayMessage } from '../utils/toDisplayMessage';
+import { toDisplayMessage, warnIfNotRenderable } from '../utils/toDisplayMessage';
 
 export default function Login() {
     const [loading, setLoading] = useState(false);
@@ -17,6 +17,7 @@ export default function Login() {
         } catch (error) {
             console.error('Login error:', error);
             const message = toDisplayMessage(error);
+            warnIfNotRenderable(message, 'auth.login');
             toast.error(message);
         } finally {
             setLoading(false);

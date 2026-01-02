@@ -18,17 +18,20 @@ class ErrorBoundary extends React.Component {
 
     render() {
         if (this.state.hasError) {
+            const displayMessage = typeof this.state.error === 'string'
+                ? this.state.error
+                : (this.state.error?.message ?? toDisplayMessage(this.state.error));
             return (
                 <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
                     <div className="bg-white p-8 rounded-lg shadow-xl max-w-2xl w-full">
                         <h1 className="text-2xl font-bold text-red-600 mb-4">Something went wrong</h1>
                         <div className="bg-red-50 p-4 rounded mb-4 overflow-auto max-h-60">
                             <pre className="text-sm text-red-800 whitespace-pre-wrap">
-                                {toDisplayMessage(this.state.error)}
+                                {displayMessage}
                             </pre>
                         </div>
                         <div className="bg-gray-50 p-4 rounded overflow-auto max-h-60 text-xs">
-                            <pre>{this.state.errorInfo && this.state.errorInfo.componentStack}</pre>
+                            <pre>{this.state.errorInfo?.componentStack || ''}</pre>
                         </div>
                         <button
                             onClick={() => window.location.href = '/'}

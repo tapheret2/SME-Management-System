@@ -8,6 +8,7 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [errorMessage, setErrorMessage] = useState(null);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -21,6 +22,7 @@ export function AuthProvider({ children }) {
                 const userData = await getCurrentUser();
                 setUser(userData);
             } catch (error) {
+                setErrorMessage(toDisplayMessage(error));
                 localStorage.removeItem('access_token'); // safe string
                 localStorage.removeItem('refresh_token');
             }
@@ -35,10 +37,13 @@ export function AuthProvider({ children }) {
             localStorage.setItem('refresh_token', data.refresh_token);
             const userData = await getCurrentUser();
             setUser(userData);
+            setErrorMessage(null);
             navigate('/');
         } catch (error) {
+            const message = toDisplayMessage(error);
+            setErrorMessage(message);
             // Throw string so consumer (Login.jsx) doesn't get object
-            throw toDisplayMessage(error);
+            throw message;
         }
     };
 
@@ -49,6 +54,7 @@ export function AuthProvider({ children }) {
             // Ignore errors
         }
         setUser(null);
+        setErrorMessage(null);
         navigate('/login');
     };
 
@@ -60,11 +66,16 @@ export function AuthProvider({ children }) {
         return roles.includes(user.role);
     };
 
-    return (
-        <AuthContext.Provider value={{ user, loading, login, logout, hasRole }}>
-            {children}
-        </AuthContext.Provider>
-    );
+    const contextValue = {
+        user,
+        loading,
+        errorMessage,
+        login,
+        logout,
+        hasRole
+    };
+
+    return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

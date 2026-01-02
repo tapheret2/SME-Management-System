@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import api from '../api/client';
 import { getProducts, getLowStockProducts } from '../api/products';
-import { toDisplayMessage } from '../utils/toDisplayMessage';
+import { toDisplayMessage, warnIfNotRenderable } from '../utils/toDisplayMessage';
 
 function formatVND(value) {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
@@ -46,7 +46,11 @@ export default function Inventory() {
             toast.success('Cập nhật tồn kho thành công!');
             closeModal();
         },
-        onError: (error) => toast.error(toDisplayMessage(error)),
+        onError: (error) => {
+            const message = toDisplayMessage(error);
+            warnIfNotRenderable(message, 'inventory.stockMutation');
+            toast.error(message);
+        },
     });
 
     const openModal = (type) => {

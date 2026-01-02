@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { getCustomers, createCustomer, updateCustomer, deleteCustomer } from '../api/customers';
-import { toDisplayMessage } from '../utils/toDisplayMessage';
+import { toDisplayMessage, warnIfNotRenderable } from '../utils/toDisplayMessage';
 import { cleanFormData } from '../utils/form';
 
 function formatVND(value) {
@@ -31,7 +31,11 @@ export default function Customers() {
             toast.success('Tạo khách hàng thành công!');
             closeModal();
         },
-        onError: (error) => toast.error(toDisplayMessage(error)),
+        onError: (error) => {
+            const message = toDisplayMessage(error);
+            warnIfNotRenderable(message, 'customers.create');
+            toast.error(message);
+        },
     });
 
     const updateMutation = useMutation({
@@ -41,7 +45,11 @@ export default function Customers() {
             toast.success('Cập nhật thành công!');
             closeModal();
         },
-        onError: (error) => toast.error(toDisplayMessage(error)),
+        onError: (error) => {
+            const message = toDisplayMessage(error);
+            warnIfNotRenderable(message, 'customers.update');
+            toast.error(message);
+        },
     });
 
     const deleteMutation = useMutation({
@@ -50,7 +58,11 @@ export default function Customers() {
             queryClient.invalidateQueries({ queryKey: ['customers'] });
             toast.success('Xóa thành công!');
         },
-        onError: (error) => toast.error(toDisplayMessage(error)),
+        onError: (error) => {
+            const message = toDisplayMessage(error);
+            warnIfNotRenderable(message, 'customers.delete');
+            toast.error(message);
+        },
     });
 
     const openModal = (item = null) => {

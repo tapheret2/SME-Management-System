@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { getOrders, createOrder, updateOrderStatus } from '../api/orders';
-import { toDisplayMessage } from '../utils/toDisplayMessage';
+import { toDisplayMessage, warnIfNotRenderable } from '../utils/toDisplayMessage';
 import { cleanFormData } from '../utils/form';
 import { getCustomers } from '../api/customers';
 import { getProducts } from '../api/products';
@@ -30,6 +30,11 @@ export default function Orders() {
         },
         onError: (error) => {
             const msg = toDisplayMessage(error);
+            warnIfNotRenderable(msg, 'orders.create');
+            if (import.meta?.env?.DEV) {
+                console.log('[Create order] error payload:', error?.response?.data ?? error);
+                console.log('[Create order] display message:', msg);
+            }
             toast.error(msg);
         },
     });
@@ -42,6 +47,7 @@ export default function Orders() {
         },
         onError: (error) => {
             const msg = toDisplayMessage(error);
+            warnIfNotRenderable(msg, 'orders.updateStatus');
             toast.error(msg);
         },
     });

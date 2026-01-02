@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { getProducts, createProduct, updateProduct, deleteProduct } from '../api/products';
-import { toDisplayMessage } from '../utils/toDisplayMessage';
+import { toDisplayMessage, warnIfNotRenderable } from '../utils/toDisplayMessage';
 import { cleanFormData } from '../utils/form';
 
 function formatVND(value) {
@@ -33,6 +33,7 @@ export default function Products() {
         },
         onError: (error) => {
             const msg = toDisplayMessage(error);
+            warnIfNotRenderable(msg, 'products.create');
             toast.error(msg);
         },
     });
@@ -46,6 +47,7 @@ export default function Products() {
         },
         onError: (error) => {
             const msg = toDisplayMessage(error);
+            warnIfNotRenderable(msg, 'products.update');
             toast.error(msg);
         },
     });
@@ -58,6 +60,7 @@ export default function Products() {
         },
         onError: (error) => {
             const msg = toDisplayMessage(error);
+            warnIfNotRenderable(msg, 'products.delete');
             toast.error(msg);
         },
     });

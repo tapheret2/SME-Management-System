@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getRevenueReport, getTopProducts, getInventoryValuation, getARAPSummary } from '../api/reports';
-import { toDisplayMessage } from '../utils/toDisplayMessage';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 function formatVND(value) {
