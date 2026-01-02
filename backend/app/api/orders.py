@@ -18,6 +18,7 @@ from app.schemas.order import (
     OrderResponse, OrderListResponse
 )
 from app.api.deps import get_current_user
+from app.services.audit import log_action
 
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -94,6 +95,11 @@ def create_order(
     
     db.flush()
     order.calculate_totals()
+    
+    # Audit log
+    log_action(db, "create", "order", order.id, current_user.id,
+               after_data={"order_number": order.order_number, "total": str(order.total)})
+    
     db.commit()
     db.refresh(order)
     return order
@@ -131,6 +137,7 @@ def update_order_status(
         raise HTTPException(status_code=404, detail="Order not found")
     
     new_status = OrderStatus(data.status)
+    old_status = order.status.value
     
     if not order.can_transition_to(new_status):
         raise HTTPException(
@@ -182,6 +189,12 @@ def update_order_status(
             db.add(movement)
     
     order.status = new_status
+    
+    # Audit log for status change
+    log_action(db, "status_change", "order", order.id, current_user.id,
+               before_data={"status": old_status},
+               after_data={"status": new_status.value})
+    
     db.commit()
     db.refresh(order)
     return order

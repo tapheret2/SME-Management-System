@@ -1,5 +1,5 @@
 """
-FastAPI main application - Milestone 5 (Complete)
+FastAPI main application - Complete with Audit
 Full SME Management System API
 """
 from fastapi import FastAPI, Depends
@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db, engine, Base
-from app.api import auth, products, stock, customers, orders, payments, reports, export
+from app.api import auth, products, stock, customers, orders, payments, reports, export, audit
 
 # Create tables on startup (dev only)
 if settings.DEBUG:
@@ -39,6 +39,7 @@ app.include_router(orders.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(export.router, prefix="/api")
+app.include_router(audit.router, prefix="/api")
 
 
 @app.get("/")

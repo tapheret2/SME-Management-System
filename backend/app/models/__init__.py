@@ -7,6 +7,7 @@ from app.models.customer import Customer
 from app.models.supplier import Supplier
 from app.models.order import SalesOrder, SalesOrderItem, OrderStatus, STATUS_TRANSITIONS
 from app.models.payment import Payment, PaymentType, PaymentMethod
+from app.models.audit import AuditLog, ActionType
 
 __all__ = [
     "UUIDMixin", "TimestampMixin", "UUID",
@@ -16,5 +17,6 @@ __all__ = [
     "Customer",
     "Supplier",
     "SalesOrder", "SalesOrderItem", "OrderStatus", "STATUS_TRANSITIONS",
-    "Payment", "PaymentType", "PaymentMethod"
+    "Payment", "PaymentType", "PaymentMethod",
+    "AuditLog", "ActionType"
 ]

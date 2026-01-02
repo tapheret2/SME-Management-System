@@ -1,43 +1,35 @@
-from typing import Optional
+"""Audit service for logging entity changes."""
+import json
+from typing import Optional, Any
+from uuid import UUID
+
 from sqlalchemy.orm import Session
 
 from app.models.audit import AuditLog
 
 
-def create_audit_log(
+def log_action(
     db: Session,
-    user_id: int,
-    entity_type: str,
-    entity_id: int,
     action: str,
-    old_values: Optional[dict] = None,
-    new_values: Optional[dict] = None
-) -> AuditLog:
-    """Create an audit log entry."""
-    log = AuditLog(
-        user_id=user_id,
+    entity_type: str,
+    entity_id: UUID,
+    user_id: UUID,
+    before_data: Optional[dict] = None,
+    after_data: Optional[dict] = None
+):
+    """Log an action to audit trail. Minimal and non-blocking."""
+    audit = AuditLog(
+        action=action,
         entity_type=entity_type,
         entity_id=entity_id,
-        action=action,
-        old_values=old_values,
-        new_values=new_values
+        user_id=user_id,
+        before_data=json.dumps(before_data, default=str) if before_data else None,
+        after_data=json.dumps(after_data, default=str) if after_data else None
     )
-    db.add(log)
-    db.commit()
-    db.refresh(log)
-    return log
+    db.add(audit)
+    # Note: commit handled by caller to avoid extra DB roundtrip
 
 
-def log_create(db: Session, user_id: int, entity_type: str, entity_id: int, new_values: dict) -> AuditLog:
-    """Log a create action."""
-    return create_audit_log(db, user_id, entity_type, entity_id, "create", new_values=new_values)
-
-
-def log_update(db: Session, user_id: int, entity_type: str, entity_id: int, old_values: dict, new_values: dict) -> AuditLog:
-    """Log an update action."""
-    return create_audit_log(db, user_id, entity_type, entity_id, "update", old_values=old_values, new_values=new_values)
-
-
-def log_delete(db: Session, user_id: int, entity_type: str, entity_id: int, old_values: dict) -> AuditLog:
-    """Log a delete action."""
-    return create_audit_log(db, user_id, entity_type, entity_id, "delete", old_values=old_values)
+def entity_snapshot(obj, fields: list[str]) -> dict:
+    """Create minimal snapshot of entity for audit."""
+    return {f: getattr(obj, f, None) for f in fields if hasattr(obj, f)}

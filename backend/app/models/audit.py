@@ -1,32 +1,34 @@
-"""Audit Log model."""
-from sqlalchemy import Column, String, ForeignKey, Index, DateTime
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import relationship
+"""AuditLog model."""
+import enum
+from sqlalchemy import Column, String, Text, Index, DateTime
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 
 from app.database import Base
-from app.models.base import UUIDMixin
+from app.models.base import UUIDMixin, UUID
+
+
+class ActionType(str, enum.Enum):
+    CREATE = "create"
+    UPDATE = "update"
+    STATUS_CHANGE = "status_change"
+    DELETE = "delete"
 
 
 class AuditLog(Base, UUIDMixin):
-    """Audit log for tracking entity changes - only has created_at."""
     __tablename__ = "audit_logs"
     
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    entity_type = Column(String(100), nullable=False)
-    entity_id = Column(UUID(as_uuid=True), nullable=False)
-    action = Column(String(50), nullable=False)  # create, update, delete
-    old_values = Column(JSONB, nullable=True)
-    new_values = Column(JSONB, nullable=True)
+    action = Column(String(20), nullable=False)
+    entity_type = Column(String(50), nullable=False)
+    entity_id = Column(UUID(), nullable=False)
+    user_id = Column(UUID(), nullable=False)
+    before_data = Column(Text, nullable=True)  # JSON string
+    after_data = Column(Text, nullable=True)   # JSON string
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
-    # Relationships
-    user = relationship("User", back_populates="audit_logs")
-    
     __table_args__ = (
-        Index("idx_audit_logs_entity", "entity_type", "entity_id"),
-        Index("idx_audit_logs_created_at", "created_at"),
-        Index("idx_audit_logs_action", "action"),
+        Index("idx_audit_entity", "entity_type", "entity_id"),
+        Index("idx_audit_created_at", "created_at"),
     )
     
     def __repr__(self):
