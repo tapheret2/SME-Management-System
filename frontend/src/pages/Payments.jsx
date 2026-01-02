@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { getPayments, createPayment, getReceivables, getPayables } from '../api/payments';
-import { getErrorMessage } from '../utils/errors';
+import { getPayments, createPayment, updatePaymentStatus } from '../api/payments';
+import { toDisplayMessage } from '../utils/toDisplayMessage';
 import { getCustomers } from '../api/customers';
 import { getSuppliers } from '../api/suppliers';
 import { format } from 'date-fns';
@@ -61,7 +61,7 @@ export default function Payments() {
             toast.success('Tạo phiếu thanh toán thành công!');
             closeModal();
         },
-        onError: (error) => toast.error(getErrorMessage(error, 'Có lỗi xảy ra')),
+        onError: (error) => toast.error(toDisplayMessage(error)),
     });
 
     const openModal = () => {

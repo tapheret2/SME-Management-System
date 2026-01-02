@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { getCustomers, createCustomer, updateCustomer, deleteCustomer } from '../api/customers';
-import { getErrorMessage } from '../utils/errors';
+import { toDisplayMessage } from '../utils/toDisplayMessage';
 import { cleanFormData } from '../utils/form';
 
 function formatVND(value) {
@@ -31,7 +31,7 @@ export default function Customers() {
             toast.success('Tạo khách hàng thành công!');
             closeModal();
         },
-        onError: (error) => toast.error(getErrorMessage(error, 'Không thể tạo khách hàng')),
+        onError: (error) => toast.error(toDisplayMessage(error)),
     });
 
     const updateMutation = useMutation({
@@ -41,7 +41,7 @@ export default function Customers() {
             toast.success('Cập nhật thành công!');
             closeModal();
         },
-        onError: (error) => toast.error(getErrorMessage(error, 'Không thể cập nhật')),
+        onError: (error) => toast.error(toDisplayMessage(error)),
     });
 
     const deleteMutation = useMutation({
@@ -50,7 +50,7 @@ export default function Customers() {
             queryClient.invalidateQueries({ queryKey: ['customers'] });
             toast.success('Xóa thành công!');
         },
-        onError: (error) => toast.error(getErrorMessage(error, 'Không thể xóa')),
+        onError: (error) => toast.error(toDisplayMessage(error)),
     });
 
     const openModal = (item = null) => {

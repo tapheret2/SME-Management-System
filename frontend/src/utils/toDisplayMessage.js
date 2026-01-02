@@ -18,10 +18,17 @@ export const toDisplayMessage = (error) => {
                 return detail.map(item => {
                     if (typeof item === 'string') return item;
                     if (item && typeof item === 'object') {
-                        return item.msg || item.message || JSON.stringify(item);
+                        // Extract field path if available (e.g. loc: ['body', 'line_items', 0, 'quantity'])
+                        let prefix = '';
+                        if (item.loc && Array.isArray(item.loc)) {
+                            // meaningful path usually starts after 'body'
+                            const path = item.loc.filter(p => p !== 'body').join('.');
+                            if (path) prefix = `${path}: `;
+                        }
+                        return `${prefix}${item.msg || item.message || JSON.stringify(item)}`;
                     }
                     return String(item);
-                }).join('; ');
+                }).join('\n');
             }
 
             // Case C: Detail is a single object

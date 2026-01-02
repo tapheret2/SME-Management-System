@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, login as loginApi, logout as logoutApi } from '../api/auth';
+import { toDisplayMessage } from '../utils/toDisplayMessage';
 
 const AuthContext = createContext(null);
 
@@ -20,7 +21,7 @@ export function AuthProvider({ children }) {
                 const userData = await getCurrentUser();
                 setUser(userData);
             } catch (error) {
-                localStorage.removeItem('access_token');
+                localStorage.removeItem('access_token'); // safe string
                 localStorage.removeItem('refresh_token');
             }
         }
@@ -28,12 +29,17 @@ export function AuthProvider({ children }) {
     };
 
     const login = async (email, password) => {
-        const data = await loginApi(email, password);
-        localStorage.setItem('access_token', data.access_token);
-        localStorage.setItem('refresh_token', data.refresh_token);
-        const userData = await getCurrentUser();
-        setUser(userData);
-        navigate('/');
+        try {
+            const data = await loginApi(email, password);
+            localStorage.setItem('access_token', data.access_token);
+            localStorage.setItem('refresh_token', data.refresh_token);
+            const userData = await getCurrentUser();
+            setUser(userData);
+            navigate('/');
+        } catch (error) {
+            // Throw string so consumer (Login.jsx) doesn't get object
+            throw toDisplayMessage(error);
+        }
     };
 
     const logout = async () => {

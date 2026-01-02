@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { getProducts, createProduct, updateProduct, deleteProduct } from '../api/products';
-import { getErrorMessage } from '../utils/errors';
+import { toDisplayMessage } from '../utils/toDisplayMessage';
 import { cleanFormData } from '../utils/form';
 
 function formatVND(value) {
@@ -32,7 +32,8 @@ export default function Products() {
             closeModal();
         },
         onError: (error) => {
-            toast.error(getErrorMessage(error, 'Có lỗi xảy ra'));
+            const msg = toDisplayMessage(error);
+            toast.error(msg);
         },
     });
 
@@ -44,7 +45,8 @@ export default function Products() {
             closeModal();
         },
         onError: (error) => {
-            toast.error(getErrorMessage(error, 'Có lỗi xảy ra'));
+            const msg = toDisplayMessage(error);
+            toast.error(msg);
         },
     });
 
@@ -53,6 +55,10 @@ export default function Products() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['products'] });
             toast.success('Xóa sản phẩm thành công!');
+        },
+        onError: (error) => {
+            const msg = toDisplayMessage(error);
+            toast.error(msg);
         },
     });
 

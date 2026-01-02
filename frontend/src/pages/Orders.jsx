@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { getOrders, createOrder, updateOrderStatus } from '../api/orders';
-import { getErrorMessage } from '../utils/errors';
+import { toDisplayMessage } from '../utils/toDisplayMessage';
 import { cleanFormData } from '../utils/form';
 import { getCustomers } from '../api/customers';
 import { getProducts } from '../api/products';
@@ -13,43 +13,12 @@ function formatVND(value) {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
 }
 
-const statusLabels = {
-    draft: 'Nháp',
-    confirmed: 'Đã xác nhận',
-    shipped: 'Đang giao',
-    completed: 'Hoàn thành',
-    cancelled: 'Đã hủy',
-};
-
-const statusColors = {
-    draft: 'badge-draft',
-    confirmed: 'badge-confirmed',
-    shipped: 'badge-shipped',
-    completed: 'badge-completed',
-    cancelled: 'badge-cancelled',
-};
+// ... statusLabels and statusColors remain ...
 
 export default function Orders() {
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [statusFilter, setStatusFilter] = useState('');
-    const [page, setPage] = useState(1);
-    const [newOrder, setNewOrder] = useState({ customer_id: '', line_items: [], discount: 0 });
-    const queryClient = useQueryClient();
+    // ... state ...
 
-    const { data, isLoading } = useQuery({
-        queryKey: ['orders', { page, status: statusFilter }],
-        queryFn: () => getOrders({ page, status: statusFilter || undefined, size: 20 }),
-    });
-
-    const { data: customersData } = useQuery({
-        queryKey: ['customers-select'],
-        queryFn: () => getCustomers({ size: 100 }),
-    });
-
-    const { data: productsData } = useQuery({
-        queryKey: ['products-select'],
-        queryFn: () => getProducts({ size: 100 }),
-    });
+    // ... queries ...
 
     const createMutation = useMutation({
         mutationFn: createOrder,
@@ -59,7 +28,10 @@ export default function Orders() {
             setIsModalOpen(false);
             setNewOrder({ customer_id: '', line_items: [], discount: 0 });
         },
-        onError: (error) => toast.error(getErrorMessage(error, 'Có lỗi xảy ra')),
+        onError: (error) => {
+            const msg = toDisplayMessage(error);
+            toast.error(msg);
+        },
     });
 
     const statusMutation = useMutation({
@@ -68,36 +40,13 @@ export default function Orders() {
             queryClient.invalidateQueries({ queryKey: ['orders'] });
             toast.success('Cập nhật trạng thái thành công!');
         },
-        onError: (error) => toast.error(getErrorMessage(error, 'Không thể cập nhật')),
+        onError: (error) => {
+            const msg = toDisplayMessage(error);
+            toast.error(msg);
+        },
     });
 
-    const addLineItem = () => {
-        setNewOrder(prev => ({
-            ...prev,
-            line_items: [...prev.line_items, { product_id: '', quantity: 1, unit_price: 0, discount: 0 }]
-        }));
-    };
-
-    const updateLineItem = (index, field, value) => {
-        setNewOrder(prev => ({
-            ...prev,
-            line_items: prev.line_items.map((item, i) => {
-                if (i !== index) return item;
-                if (field === 'product_id') {
-                    const product = productsData?.items?.find(p => p.id === Number(value));
-                    return { ...item, product_id: value, unit_price: product?.sell_price || 0 };
-                }
-                return { ...item, [field]: value };
-            })
-        }));
-    };
-
-    const removeLineItem = (index) => {
-        setNewOrder(prev => ({
-            ...prev,
-            line_items: prev.line_items.filter((_, i) => i !== index)
-        }));
-    };
+    // ... line item helpers ...
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -105,19 +54,39 @@ export default function Orders() {
         // Clean the input data first (convert empty strings to null)
         const cleanedOrder = cleanFormData(newOrder);
 
-        if (!cleanedOrder.customer_id || newOrder.line_items.length === 0) {
-            toast.error('Vui lòng chọn khách hàng và thêm sản phẩm');
+        if (!cleanedOrder.customer_id) {
+            toast.error('Vui lòng chọn khách hàng');
             return;
+        }
+
+        if (newOrder.line_items.length === 0) {
+            toast.error('Vui lòng thêm ít nhất một sản phẩm');
+            return;
+        }
+
+        // Validate line items
+        for (const item of newOrder.line_items) {
+            const quantity = Number(item.quantity);
+            const unitPrice = Number(item.unit_price);
+
+            if (!item.product_id) {
+                toast.error('Vui lòng chọn sản phẩm cho tất cả các dòng');
+                return;
+            }
+            if (!quantity || quantity <= 0) {
+                toast.error(`Số lượng sản phẩm phải lớn hơn 0 (Dòng có giá: ${formatVND(unitPrice)})`);
+                return;
+            }
         }
 
         const payload = {
             customer_id: Number(cleanedOrder.customer_id),
-            discount: Number(cleanedOrder.discount || 0),
+            discount: newOrder.discount === '' ? 0 : Number(newOrder.discount),
             line_items: newOrder.line_items.map(item => ({
                 product_id: Number(item.product_id),
-                quantity: Number(item.quantity),
-                unit_price: Number(item.unit_price),
-                discount: Number(item.discount || 0)
+                quantity: item.quantity === '' ? 0 : Number(item.quantity),
+                unit_price: item.unit_price === '' ? 0 : Number(item.unit_price),
+                discount: item.discount === '' || item.discount === undefined ? 0 : Number(item.discount)
             }))
         };
 

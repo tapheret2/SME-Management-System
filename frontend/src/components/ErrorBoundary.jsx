@@ -1,4 +1,5 @@
 import React from 'react';
+import { toDisplayMessage } from '../utils/toDisplayMessage';
 
 class ErrorBoundary extends React.Component {
     constructor(props) {
@@ -23,7 +24,7 @@ class ErrorBoundary extends React.Component {
                         <h1 className="text-2xl font-bold text-red-600 mb-4">Something went wrong</h1>
                         <div className="bg-red-50 p-4 rounded mb-4 overflow-auto max-h-60">
                             <pre className="text-sm text-red-800 whitespace-pre-wrap">
-                                {this.state.error && this.state.error.toString()}
+                                {toDisplayMessage(this.state.error)}
                             </pre>
                         </div>
                         <div className="bg-gray-50 p-4 rounded overflow-auto max-h-60 text-xs">
