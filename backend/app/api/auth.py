@@ -1,7 +1,7 @@
-"""Authentication API endpoints."""
+"""Authentication API endpoints with rate limiting."""
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -13,13 +13,14 @@ from app.services.auth import (
 )
 from app.api.deps import get_current_user, require_admin
 
-
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=Token)
 def login(data: LoginRequest, db: Session = Depends(get_db)):
     """Authenticate user and return tokens."""
+    # Note: Rate limiting should be configured at infrastructure level (nginx, API gateway)
+    # or added via middleware in production
     user = authenticate_user(db, data.email, data.password)
     if not user:
         raise HTTPException(

@@ -4,11 +4,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from app.database import get_db
 from app.models.customer import Customer
+from app.models.order import SalesOrder
 from app.schemas.customer import CustomerCreate, CustomerUpdate, CustomerResponse, CustomerListResponse
 from app.api.deps import get_current_user
+from app.helpers import sanitize_like
 
 
 router = APIRouter(prefix="/customers", tags=["customers"])
@@ -26,10 +29,13 @@ def list_customers(
     query = db.query(Customer)
     
     if search:
+        safe_search = sanitize_like(search)
         query = query.filter(
-            Customer.code.ilike(f"%{search}%") | 
-            Customer.name.ilike(f"%{search}%") |
-            Customer.phone.ilike(f"%{search}%")
+            or_(
+                Customer.code.ilike(f"%{safe_search}%"),
+                Customer.name.ilike(f"%{safe_search}%"),
+                Customer.phone.ilike(f"%{safe_search}%")
+            )
         )
     
     total = query.count()
@@ -95,10 +101,15 @@ def delete_customer(
     db: Session = Depends(get_db),
     _current_user = Depends(get_current_user)
 ):
-    """Delete a customer."""
+    """Delete a customer (checks for existing orders first)."""
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
+    
+    # P2 Fix: Check for existing orders before delete
+    has_orders = db.query(SalesOrder).filter(SalesOrder.customer_id == customer_id).first()
+    if has_orders:
+        raise HTTPException(status_code=400, detail="Cannot delete customer with existing orders")
     
     db.delete(customer)
     db.commit()

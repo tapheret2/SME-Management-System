@@ -4,6 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from app.database import get_db
 from app.models.product import Product
@@ -12,6 +13,7 @@ from app.schemas.product import (
     ProductListResponse, LowStockProduct
 )
 from app.api.deps import get_current_user
+from app.helpers import sanitize_like
 
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -34,8 +36,9 @@ def list_products(
         query = query.filter(Product.is_active == True)
     
     if search:
+        safe_search = sanitize_like(search)
         query = query.filter(
-            Product.sku.ilike(f"%{search}%") | Product.name.ilike(f"%{search}%")
+            or_(Product.sku.ilike(f"%{safe_search}%"), Product.name.ilike(f"%{safe_search}%"))
         )
     
     if category:
