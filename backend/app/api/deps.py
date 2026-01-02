@@ -1,4 +1,7 @@
-from typing import Annotated
+"""API dependencies - DB session and authentication."""
+from typing import Optional
+from uuid import UUID
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -8,62 +11,54 @@ from app.models.user import User, UserRole
 from app.services.auth import decode_token, get_user_by_id
 
 
-# Security scheme
-security = HTTPBearer()
-
-# Type aliases
-DBSession = Annotated[Session, Depends(get_db)]
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
-async def get_current_user(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
-    db: DBSession
+def get_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+    db: Session = Depends(get_db)
 ) -> User:
-    """Get the current authenticated user from the JWT token."""
-    token = credentials.credentials
-    
-    payload = decode_token(token)
-    if payload is None:
+    """Get current authenticated user from JWT."""
+    if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"}
+            detail="Not authenticated"
         )
     
-    if payload.type != "access":
+    payload = decode_token(credentials.credentials)
+    if not payload or payload.get("type") != "access":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token type",
-            headers={"WWW-Authenticate": "Bearer"}
+            detail="Invalid or expired token"
         )
     
-    user = get_user_by_id(db, payload.sub)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive",
-            headers={"WWW-Authenticate": "Bearer"}
-        )
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    
+    user = get_user_by_id(db, UUID(user_id))
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
     
     return user
 
 
-CurrentUser = Annotated[User, Depends(get_current_user)]
+def get_current_active_user(user: User = Depends(get_current_user)) -> User:
+    """Ensure current user is active."""
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive")
+    return user
 
 
-def require_roles(*roles: UserRole):
-    """Dependency factory for role-based access control."""
-    async def role_checker(current_user: CurrentUser) -> User:
-        if current_user.role not in roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions. Required roles: {[r.value for r in roles]}"
-            )
-        return current_user
-    return role_checker
+def require_admin(user: User = Depends(get_current_user)) -> User:
+    """Require admin role."""
+    if user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    return user
 
 
-# Pre-defined role dependencies
-AdminOnly = Annotated[User, Depends(require_roles(UserRole.ADMIN))]
-ManagerOrAdmin = Annotated[User, Depends(require_roles(UserRole.ADMIN, UserRole.MANAGER))]
-AllRoles = Annotated[User, Depends(require_roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF))]
+def require_manager(user: User = Depends(get_current_user)) -> User:
+    """Require manager or admin role."""
+    if user.role not in [UserRole.ADMIN, UserRole.MANAGER]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Manager access required")
+    return user

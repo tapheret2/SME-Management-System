@@ -1,4 +1,4 @@
-"""Stock movement schemas with UUID support."""
+"""Stock movement schemas."""
 from datetime import datetime
 from uuid import UUID
 from typing import Optional
@@ -8,14 +8,12 @@ from pydantic import BaseModel, Field
 class StockInCreate(BaseModel):
     product_id: UUID
     quantity: int = Field(..., gt=0)
-    supplier_id: Optional[UUID] = None
     reason: Optional[str] = None
 
 
 class StockOutCreate(BaseModel):
     product_id: UUID
     quantity: int = Field(..., gt=0)
-    order_id: Optional[UUID] = None
     reason: Optional[str] = None
 
 
@@ -28,11 +26,6 @@ class StockAdjustCreate(BaseModel):
 class StockMovementResponse(BaseModel):
     id: UUID
     product_id: UUID
-    product_sku: Optional[str] = None
-    product_name: Optional[str] = None
-    supplier_id: Optional[UUID] = None
-    supplier_name: Optional[str] = None
-    order_id: Optional[UUID] = None
     created_by: UUID
     type: str
     quantity: int
@@ -41,7 +34,8 @@ class StockMovementResponse(BaseModel):
     reason: Optional[str] = None
     created_at: datetime
     
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True
 
 
 class StockMovementListResponse(BaseModel):

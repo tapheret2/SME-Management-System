@@ -1,4 +1,4 @@
-"""Product schemas with UUID support."""
+"""Product schemas."""
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -49,7 +49,8 @@ class ProductResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True
 
 
 class ProductListResponse(BaseModel):
@@ -64,4 +65,5 @@ class LowStockProduct(BaseModel):
     current_stock: int
     min_stock: int
     
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True

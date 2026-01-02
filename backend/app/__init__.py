@@ -1,1 +1,1 @@
-# SME Backend Application
+# SME Backend App

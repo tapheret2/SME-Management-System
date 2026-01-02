@@ -1,7 +1,5 @@
 """Product model."""
 from sqlalchemy import Column, String, Integer, Boolean, Numeric, Text, Index
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
 from decimal import Decimal
 
 from app.database import Base
@@ -21,10 +19,6 @@ class Product(Base, UUIDMixin, TimestampMixin):
     current_stock = Column(Integer, default=0, nullable=False)
     min_stock = Column(Integer, default=0, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
-    
-    # Relationships
-    order_items = relationship("SalesOrderItem", back_populates="product")
-    stock_movements = relationship("StockMovement", back_populates="product")
     
     __table_args__ = (
         Index("idx_products_category", "category"),

@@ -1,4 +1,4 @@
-"""User schemas with UUID support."""
+"""User schemas."""
 from datetime import datetime
 from uuid import UUID
 from typing import Optional
@@ -32,12 +32,8 @@ class UserResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-    model_config = {"from_attributes": True}
-
-
-class UserListResponse(BaseModel):
-    items: list[UserResponse]
-    total: int
+    class Config:
+        from_attributes = True
 
 
 # Auth schemas

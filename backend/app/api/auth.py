@@ -1,90 +1,102 @@
-from fastapi import APIRouter, HTTPException, status
+"""Authentication API endpoints."""
+from uuid import UUID
 
-from app.api.deps import DBSession, CurrentUser
-from app.schemas.user import Token, LoginRequest, RefreshRequest, UserResponse
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models.user import User, UserRole
+from app.schemas.user import Token, TokenRefresh, LoginRequest, UserResponse, UserCreate
 from app.services.auth import (
-    authenticate_user,
-    create_access_token,
-    create_refresh_token,
-    decode_token,
-    get_user_by_id
+    authenticate_user, create_access_token, create_refresh_token,
+    decode_token, get_user_by_id, hash_password
 )
-from app.models.user import UserRole
+from app.api.deps import get_current_user, require_admin
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=Token)
-async def login(request: LoginRequest, db: DBSession):
-    """
-    Authenticate user and return JWT tokens.
-    """
-    user = authenticate_user(db, request.email, request.password)
+def login(data: LoginRequest, db: Session = Depends(get_db)):
+    """Authenticate user and return tokens."""
+    user = authenticate_user(db, data.email, data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"}
+            detail="Invalid email or password"
         )
     
-    access_token = create_access_token(user.id, user.role)
-    refresh_token = create_refresh_token(user.id, user.role)
+    access_token = create_access_token(user.id, user.role.value)
+    refresh_token = create_refresh_token(user.id)
     
-    return Token(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer"
-    )
+    # Store refresh token
+    user.refresh_token = refresh_token
+    db.commit()
+    
+    return Token(access_token=access_token, refresh_token=refresh_token)
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(request: RefreshRequest, db: DBSession):
-    """
-    Refresh access token using refresh token.
-    """
-    payload = decode_token(request.refresh_token)
-    if payload is None:
+def refresh(data: TokenRefresh, db: Session = Depends(get_db)):
+    """Refresh access token using refresh token."""
+    payload = decode_token(data.refresh_token)
+    if not payload or payload.get("type") != "refresh":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired refresh token"
+            detail="Invalid refresh token"
         )
     
-    if payload.type != "refresh":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token type"
-        )
+    user_id = payload.get("sub")
+    user = get_user_by_id(db, UUID(user_id))
     
-    user = get_user_by_id(db, payload.sub)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive"
-        )
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     
-    access_token = create_access_token(user.id, user.role)
-    refresh_token = create_refresh_token(user.id, user.role)
+    if user.refresh_token != data.refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revoked")
     
-    return Token(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer"
-    )
+    access_token = create_access_token(user.id, user.role.value)
+    refresh_token = create_refresh_token(user.id)
+    
+    user.refresh_token = refresh_token
+    db.commit()
+    
+    return Token(access_token=access_token, refresh_token=refresh_token)
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(current_user: CurrentUser):
-    """
-    Get current authenticated user's information.
-    """
+def get_me(current_user: User = Depends(get_current_user)):
+    """Get current user info."""
     return current_user
 
 
 @router.post("/logout")
-async def logout(current_user: CurrentUser):
-    """
-    Logout the current user (client should discard tokens).
-    """
-    # For MVP, we just return success - client should discard tokens
-    # In production, you might want to maintain a token blacklist
-    return {"message": "Successfully logged out"}
+def logout(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Logout user - invalidate refresh token."""
+    current_user.refresh_token = None
+    db.commit()
+    return {"message": "Logged out successfully"}
+
+
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def register(
+    data: UserCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    """Register new user (admin only)."""
+    existing = db.query(User).filter(User.email == data.email).first()
+    if existing:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+    
+    user = User(
+        email=data.email,
+        hashed_password=hash_password(data.password),
+        full_name=data.full_name,
+        role=UserRole(data.role)
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user

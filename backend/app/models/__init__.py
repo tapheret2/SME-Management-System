@@ -1,33 +1,16 @@
-"""Models package - import all models for Alembic."""
-from app.models.base import UUIDMixin, TimestampMixin, SoftDeleteMixin
+"""Models package."""
+from app.models.base import UUIDMixin, TimestampMixin, UUID
 from app.models.user import User, UserRole
-from app.models.customer import Customer
-from app.models.supplier import Supplier
 from app.models.product import Product
-from app.models.order import SalesOrder, SalesOrderItem, OrderStatus, STATUS_TRANSITIONS
 from app.models.stock import StockMovement, MovementType
-from app.models.payment import Payment, PaymentType, PaymentMethod
-from app.models.audit import AuditLog
+from app.models.customer import Customer
+from app.models.order import SalesOrder, SalesOrderItem, OrderStatus, STATUS_TRANSITIONS
 
 __all__ = [
-    # Mixins
-    "UUIDMixin",
-    "TimestampMixin", 
-    "SoftDeleteMixin",
-    # Models
-    "User",
-    "UserRole",
-    "Customer",
-    "Supplier",
+    "UUIDMixin", "TimestampMixin", "UUID",
+    "User", "UserRole",
     "Product",
-    "SalesOrder",
-    "SalesOrderItem",
-    "OrderStatus",
-    "STATUS_TRANSITIONS",
-    "StockMovement",
-    "MovementType",
-    "Payment",
-    "PaymentType",
-    "PaymentMethod",
-    "AuditLog",
+    "StockMovement", "MovementType",
+    "Customer",
+    "SalesOrder", "SalesOrderItem", "OrderStatus", "STATUS_TRANSITIONS"
 ]

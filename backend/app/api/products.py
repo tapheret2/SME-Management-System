@@ -1,63 +1,58 @@
-from fastapi import APIRouter, HTTPException, status, Query
-from typing import Optional, List
+"""Products API endpoints."""
+from typing import Optional
+from uuid import UUID
 
-from app.api.deps import DBSession, CurrentUser
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.orm import Session
+
+from app.database import get_db
 from app.models.product import Product
 from app.schemas.product import (
     ProductCreate, ProductUpdate, ProductResponse, 
-    ProductListResponse, LowStockProductResponse
+    ProductListResponse, LowStockProduct
 )
-from app.services.audit import log_create, log_update, log_delete
+from app.api.deps import get_current_user
 
-router = APIRouter(prefix="/products", tags=["Products"])
+
+router = APIRouter(prefix="/products", tags=["products"])
 
 
 @router.get("", response_model=ProductListResponse)
-async def list_products(
-    db: DBSession,
-    current_user: CurrentUser,
+def list_products(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     search: Optional[str] = None,
     category: Optional[str] = None,
-    active_only: bool = True
+    active_only: bool = True,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
 ):
-    """
-    List all products with pagination and filters.
-    """
+    """List products with pagination and filtering."""
     query = db.query(Product)
     
     if active_only:
         query = query.filter(Product.is_active == True)
     
     if search:
-        search_pattern = f"%{search}%"
         query = query.filter(
-            (Product.name.ilike(search_pattern)) |
-            (Product.sku.ilike(search_pattern))
+            Product.sku.ilike(f"%{search}%") | Product.name.ilike(f"%{search}%")
         )
     
     if category:
         query = query.filter(Product.category == category)
     
     total = query.count()
-    items = query.order_by(Product.created_at.desc()).offset((page - 1) * size).limit(size).all()
+    items = query.offset((page - 1) * size).limit(size).all()
     
-    # Add is_low_stock computed property
-    result_items = []
-    for item in items:
-        item_dict = ProductResponse.model_validate(item).model_dump()
-        item_dict["is_low_stock"] = item.is_low_stock
-        result_items.append(ProductResponse(**item_dict))
-    
-    return ProductListResponse(items=result_items, total=total, page=page, size=size)
+    return ProductListResponse(items=items, total=total)
 
 
-@router.get("/low-stock", response_model=List[LowStockProductResponse])
-async def get_low_stock_products(db: DBSession, current_user: CurrentUser):
-    """
-    Get all products with low stock.
-    """
+@router.get("/low-stock", response_model=list[LowStockProduct])
+def get_low_stock_products(
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Get products with stock at or below minimum level."""
     products = db.query(Product).filter(
         Product.is_active == True,
         Product.current_stock <= Product.min_stock
@@ -66,114 +61,75 @@ async def get_low_stock_products(db: DBSession, current_user: CurrentUser):
 
 
 @router.post("", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
-async def create_product(request: ProductCreate, db: DBSession, current_user: CurrentUser):
-    """
-    Create a new product.
-    """
-    # Check if SKU already exists
-    existing = db.query(Product).filter(Product.sku == request.sku).first()
+def create_product(
+    data: ProductCreate,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Create a new product."""
+    existing = db.query(Product).filter(Product.sku == data.sku).first()
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Product SKU already exists"
-        )
+        raise HTTPException(status_code=400, detail="SKU already exists")
     
-    product = Product(**request.model_dump())
+    product = Product(**data.model_dump())
     db.add(product)
     db.commit()
     db.refresh(product)
-    
-    # Audit log
-    log_create(db, current_user.id, "product", product.id, request.model_dump())
-    
-    # Return with computed property
-    result = ProductResponse.model_validate(product).model_dump()
-    result["is_low_stock"] = product.is_low_stock
-    return ProductResponse(**result)
+    return product
 
 
 @router.get("/{product_id}", response_model=ProductResponse)
-async def get_product(product_id: int, db: DBSession, current_user: CurrentUser):
-    """
-    Get a specific product by ID.
-    """
+def get_product(
+    product_id: UUID,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Get a single product by ID."""
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Product not found"
-        )
-    
-    result = ProductResponse.model_validate(product).model_dump()
-    result["is_low_stock"] = product.is_low_stock
-    return ProductResponse(**result)
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product
 
 
 @router.put("/{product_id}", response_model=ProductResponse)
-async def update_product(product_id: int, request: ProductUpdate, db: DBSession, current_user: CurrentUser):
-    """
-    Update a product.
-    """
+def update_product(
+    product_id: UUID,
+    data: ProductUpdate,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Update a product."""
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Product not found"
-        )
+        raise HTTPException(status_code=404, detail="Product not found")
     
-    old_values = {
-        "sku": product.sku,
-        "name": product.name,
-        "category": product.category,
-        "unit": product.unit,
-        "cost_price": str(product.cost_price),
-        "sell_price": str(product.sell_price),
-        "min_stock": product.min_stock,
-        "is_active": product.is_active
-    }
+    update_data = data.model_dump(exclude_unset=True)
     
-    # Check if new SKU is taken
-    if request.sku is not None and request.sku != product.sku:
-        existing = db.query(Product).filter(Product.sku == request.sku).first()
+    # Check SKU uniqueness if updating
+    if "sku" in update_data and update_data["sku"] != product.sku:
+        existing = db.query(Product).filter(Product.sku == update_data["sku"]).first()
         if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Product SKU already exists"
-            )
+            raise HTTPException(status_code=400, detail="SKU already exists")
     
-    # Update fields
-    update_data = request.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(product, field, value)
+    for key, value in update_data.items():
+        setattr(product, key, value)
     
     db.commit()
     db.refresh(product)
-    
-    # Audit log
-    log_update(db, current_user.id, "product", product.id, old_values, {k: str(v) for k, v in update_data.items()})
-    
-    result = ProductResponse.model_validate(product).model_dump()
-    result["is_low_stock"] = product.is_low_stock
-    return ProductResponse(**result)
+    return product
 
 
-@router.delete("/{product_id}")
-async def deactivate_product(product_id: int, db: DBSession, current_user: CurrentUser):
-    """
-    Deactivate a product (soft delete).
-    """
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_product(
+    product_id: UUID,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Soft delete a product (set is_active=False)."""
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Product not found"
-        )
+        raise HTTPException(status_code=404, detail="Product not found")
     
-    old_values = {"is_active": product.is_active}
     product.is_active = False
     db.commit()
-    
-    # Audit log
-    log_update(db, current_user.id, "product", product.id, old_values, {"is_active": False})
-    
-    return {"message": "Product deactivated successfully"}
+    return None

@@ -1,32 +1,27 @@
-from fastapi import FastAPI
+"""
+FastAPI main application - Milestone 3
+With auth, products, and stock endpoints
+"""
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.database import engine, Base
-from app.api import auth, users, customers, suppliers, products, orders, payments, stock, reports
-from app.utils.csv_export import router as export_router
+from app.database import get_db, engine, Base
+from app.api import auth, products, stock
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan events."""
-    # Startup: Create tables if they don't exist (for development)
-    if settings.DEBUG:
-        Base.metadata.create_all(bind=engine)
-    yield
-    # Shutdown: cleanup if needed
-    pass
-
+# Create tables on startup (dev only)
+if settings.DEBUG:
+    Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Internal web application for Vietnamese SMEs to manage Orders, Inventory, Customers, Suppliers, Payments, and Reports.",
-    version="1.0.0",
-    lifespan=lifespan
+    description="SME Management System API",
+    version="1.0.0"
 )
 
-# CORS middleware
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -37,22 +32,27 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth.router, prefix="/api")
-app.include_router(users.router, prefix="/api")
-app.include_router(customers.router, prefix="/api")
-app.include_router(suppliers.router, prefix="/api")
 app.include_router(products.router, prefix="/api")
-app.include_router(orders.router, prefix="/api")
-app.include_router(payments.router, prefix="/api")
 app.include_router(stock.router, prefix="/api")
-app.include_router(reports.router, prefix="/api")
-app.include_router(export_router, prefix="/api")
 
 
 @app.get("/")
 async def root():
+    """Root endpoint."""
     return {"message": "SME Management System API", "version": "1.0.0"}
 
 
 @app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+async def health_check(db: Session = Depends(get_db)):
+    """Health check with DB connection test."""
+    try:
+        db.execute(text("SELECT 1"))
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    
+    return {
+        "status": "healthy",
+        "database": db_status,
+        "app_name": settings.APP_NAME
+    }
