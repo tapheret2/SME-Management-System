@@ -1,4 +1,4 @@
-"""Payment schemas with UUID support."""
+"""Payment schemas."""
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -28,9 +28,7 @@ class PaymentResponse(BaseModel):
     type: str
     method: str
     customer_id: Optional[UUID] = None
-    customer_name: Optional[str] = None
     supplier_id: Optional[UUID] = None
-    supplier_name: Optional[str] = None
     order_id: Optional[UUID] = None
     created_by: UUID
     amount: Decimal
@@ -39,7 +37,8 @@ class PaymentResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True
 
 
 class PaymentListResponse(BaseModel):
@@ -47,21 +46,8 @@ class PaymentListResponse(BaseModel):
     total: int
 
 
-# AR/AP Summaries
-class DebtSummaryItem(BaseModel):
-    entity_id: UUID
-    entity_code: str
-    entity_name: str
-    total_amount: Decimal
-    paid_amount: Decimal
-    remaining_amount: Decimal
-
-
-class ReceivablesResponse(BaseModel):
-    items: list[DebtSummaryItem]
+class ARAPSummary(BaseModel):
     total_receivables: Decimal
-
-
-class PayablesResponse(BaseModel):
-    items: list[DebtSummaryItem]
+    customer_count: int
     total_payables: Decimal
+    supplier_count: int

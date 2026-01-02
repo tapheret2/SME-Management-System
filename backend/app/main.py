@@ -1,6 +1,6 @@
 """
-FastAPI main application - Milestone 3
-With auth, products, and stock endpoints
+FastAPI main application - Milestone 5 (Complete)
+Full SME Management System API
 """
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db, engine, Base
-from app.api import auth, products, stock
+from app.api import auth, products, stock, customers, orders, payments, reports, export
 
 # Create tables on startup (dev only)
 if settings.DEBUG:
@@ -17,7 +17,7 @@ if settings.DEBUG:
 
 app = FastAPI(
     title=settings.APP_NAME,
-    description="SME Management System API",
+    description="SME Management System API - Orders, Inventory, Customers, Suppliers, Payments, Reports",
     version="1.0.0"
 )
 
@@ -34,6 +34,11 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api")
 app.include_router(products.router, prefix="/api")
 app.include_router(stock.router, prefix="/api")
+app.include_router(customers.router, prefix="/api")
+app.include_router(orders.router, prefix="/api")
+app.include_router(payments.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
+app.include_router(export.router, prefix="/api")
 
 
 @app.get("/")

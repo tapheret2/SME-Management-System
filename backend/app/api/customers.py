@@ -1,151 +1,105 @@
-from fastapi import APIRouter, HTTPException, status, Query
+"""Customers API endpoints."""
 from typing import Optional
+from uuid import UUID
 
-from app.api.deps import DBSession, CurrentUser
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.orm import Session
+
+from app.database import get_db
 from app.models.customer import Customer
 from app.schemas.customer import CustomerCreate, CustomerUpdate, CustomerResponse, CustomerListResponse
-from app.services.audit import log_create, log_update, log_delete
+from app.api.deps import get_current_user
 
-router = APIRouter(prefix="/customers", tags=["Customers"])
+
+router = APIRouter(prefix="/customers", tags=["customers"])
 
 
 @router.get("", response_model=CustomerListResponse)
-async def list_customers(
-    db: DBSession,
-    current_user: CurrentUser,
+def list_customers(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
 ):
-    """
-    List all customers with pagination and search.
-    """
+    """List customers with pagination."""
     query = db.query(Customer)
     
     if search:
-        search_pattern = f"%{search}%"
         query = query.filter(
-            (Customer.name.ilike(search_pattern)) |
-            (Customer.code.ilike(search_pattern)) |
-            (Customer.phone.ilike(search_pattern))
+            Customer.code.ilike(f"%{search}%") | 
+            Customer.name.ilike(f"%{search}%") |
+            Customer.phone.ilike(f"%{search}%")
         )
     
     total = query.count()
-    items = query.order_by(Customer.created_at.desc()).offset((page - 1) * size).limit(size).all()
-    
-    return CustomerListResponse(items=items, total=total, page=page, size=size)
+    items = query.offset((page - 1) * size).limit(size).all()
+    return CustomerListResponse(items=items, total=total)
 
 
 @router.post("", response_model=CustomerResponse, status_code=status.HTTP_201_CREATED)
-async def create_customer(request: CustomerCreate, db: DBSession, current_user: CurrentUser):
-    """
-    Create a new customer.
-    """
-    # Check if code already exists
-    existing = db.query(Customer).filter(Customer.code == request.code).first()
+def create_customer(
+    data: CustomerCreate,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Create a new customer."""
+    existing = db.query(Customer).filter(Customer.code == data.code).first()
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Customer code already exists"
-        )
+        raise HTTPException(status_code=400, detail="Customer code already exists")
     
-    customer = Customer(**request.model_dump())
+    customer = Customer(**data.model_dump())
     db.add(customer)
     db.commit()
     db.refresh(customer)
-    
-    # Audit log
-    log_create(db, current_user.id, "customer", customer.id, request.model_dump())
-    
     return customer
 
 
 @router.get("/{customer_id}", response_model=CustomerResponse)
-async def get_customer(customer_id: int, db: DBSession, current_user: CurrentUser):
-    """
-    Get a specific customer by ID.
-    """
+def get_customer(
+    customer_id: UUID,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Get a single customer."""
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
     if not customer:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Customer not found"
-        )
+        raise HTTPException(status_code=404, detail="Customer not found")
     return customer
 
 
 @router.put("/{customer_id}", response_model=CustomerResponse)
-async def update_customer(customer_id: int, request: CustomerUpdate, db: DBSession, current_user: CurrentUser):
-    """
-    Update a customer.
-    """
+def update_customer(
+    customer_id: UUID,
+    data: CustomerUpdate,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Update a customer."""
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
     if not customer:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Customer not found"
-        )
+        raise HTTPException(status_code=404, detail="Customer not found")
     
-    old_values = {
-        "code": customer.code,
-        "name": customer.name,
-        "phone": customer.phone,
-        "email": customer.email,
-        "address": customer.address,
-        "notes": customer.notes
-    }
-    
-    # Check if new code is taken
-    if request.code is not None and request.code != customer.code:
-        existing = db.query(Customer).filter(Customer.code == request.code).first()
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Customer code already exists"
-            )
-    
-    # Update fields
-    update_data = request.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(customer, field, value)
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(customer, key, value)
     
     db.commit()
     db.refresh(customer)
-    
-    # Audit log
-    log_update(db, current_user.id, "customer", customer.id, old_values, update_data)
-    
     return customer
 
 
-@router.delete("/{customer_id}")
-async def delete_customer(customer_id: int, db: DBSession, current_user: CurrentUser):
-    """
-    Delete a customer.
-    """
+@router.delete("/{customer_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_customer(
+    customer_id: UUID,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Delete a customer."""
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
     if not customer:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Customer not found"
-        )
-    
-    # Check if customer has orders
-    if customer.orders:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete customer with existing orders"
-        )
-    
-    old_values = {
-        "code": customer.code,
-        "name": customer.name
-    }
+        raise HTTPException(status_code=404, detail="Customer not found")
     
     db.delete(customer)
     db.commit()
-    
-    # Audit log
-    log_delete(db, current_user.id, "customer", customer_id, old_values)
-    
-    return {"message": "Customer deleted successfully"}
+    return None

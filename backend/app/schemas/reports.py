@@ -1,5 +1,4 @@
-"""Report schemas with UUID support."""
-from datetime import date
+"""Report schemas."""
 from decimal import Decimal
 from uuid import UUID
 from pydantic import BaseModel
@@ -39,24 +38,3 @@ class TopProductItem(BaseModel):
 
 class TopProductsReport(BaseModel):
     data: list[TopProductItem]
-
-
-class InventoryItem(BaseModel):
-    product_id: UUID
-    product_sku: str
-    product_name: str
-    current_stock: int
-    cost_price: Decimal
-    total_value: Decimal
-
-
-class InventoryValuationReport(BaseModel):
-    data: list[InventoryItem]
-    total_value: Decimal
-
-
-class ARAPSummary(BaseModel):
-    total_receivables: Decimal
-    customer_count: int
-    total_payables: Decimal
-    supplier_count: int

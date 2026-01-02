@@ -1,8 +1,6 @@
 """Supplier model."""
-from sqlalchemy import Column, String, Text, Numeric, Index
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
 from decimal import Decimal
+from sqlalchemy import Column, String, Text, Numeric, Index
 
 from app.database import Base
 from app.models.base import UUIDMixin, TimestampMixin
@@ -18,10 +16,6 @@ class Supplier(Base, UUIDMixin, TimestampMixin):
     address = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
     total_payable = Column(Numeric(15, 0), default=Decimal("0"), nullable=False)
-    
-    # Relationships
-    stock_movements = relationship("StockMovement", back_populates="supplier")
-    payments = relationship("Payment", back_populates="supplier")
     
     __table_args__ = (
         Index("idx_suppliers_name", "name"),

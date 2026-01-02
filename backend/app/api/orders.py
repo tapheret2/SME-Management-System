@@ -1,344 +1,206 @@
-from fastapi import APIRouter, HTTPException, status, Query
-from typing import Optional
+"""Orders API endpoints."""
 from datetime import datetime
+from typing import Optional
+from uuid import UUID
 from decimal import Decimal
 
-from app.api.deps import DBSession, CurrentUser
-from app.models.order import SalesOrder, OrderLine, OrderStatus
-from app.models.product import Product
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.orm import Session
+
+from app.database import get_db
 from app.models.customer import Customer
-from app.models.stock import StockMovement, StockMovementType
+from app.models.product import Product
+from app.models.order import SalesOrder, SalesOrderItem, OrderStatus, STATUS_TRANSITIONS
+from app.models.stock import StockMovement, MovementType
+from app.models.user import User
 from app.schemas.order import (
-    OrderCreate, OrderUpdate, OrderStatusUpdate, OrderResponse,
-    OrderListResponse, OrderLineResponse
+    OrderCreate, OrderUpdate, OrderStatusUpdate, 
+    OrderResponse, OrderListResponse
 )
-from app.services.audit import log_create, log_update
-
-router = APIRouter(prefix="/orders", tags=["Orders"])
+from app.api.deps import get_current_user
 
 
-def generate_order_number(db: DBSession) -> str:
-    """Generate a unique order number."""
-    today = datetime.now().strftime("%Y%m%d")
-    count = db.query(SalesOrder).filter(
-        SalesOrder.order_number.like(f"SO{today}%")
-    ).count()
-    return f"SO{today}{count + 1:04d}"
+router = APIRouter(prefix="/orders", tags=["orders"])
 
 
-def calculate_order_totals(order: SalesOrder):
-    """Recalculate order totals from line items."""
-    subtotal = sum(line.line_total for line in order.line_items)
-    order.subtotal = subtotal
-    order.total = subtotal - order.discount
-
-
-def build_order_response(order: SalesOrder, db: DBSession) -> OrderResponse:
-    """Build OrderResponse from SalesOrder."""
-    line_items = []
-    for line in order.line_items:
-        product = db.query(Product).filter(Product.id == line.product_id).first()
-        line_items.append(OrderLineResponse(
-            id=line.id,
-            product_id=line.product_id,
-            quantity=line.quantity,
-            unit_price=line.unit_price,
-            discount=line.discount,
-            line_total=line.line_total,
-            product_name=product.name if product else None,
-            product_sku=product.sku if product else None
-        ))
-    
-    customer = db.query(Customer).filter(Customer.id == order.customer_id).first()
-    
-    return OrderResponse(
-        id=order.id,
-        order_number=order.order_number,
-        customer_id=order.customer_id,
-        customer_name=customer.name if customer else None,
-        created_by=order.created_by,
-        creator_name=order.creator.full_name if order.creator else None,
-        status=order.status,
-        subtotal=order.subtotal,
-        discount=order.discount,
-        total=order.total,
-        paid_amount=order.paid_amount,
-        remaining_amount=order.remaining_amount,
-        notes=order.notes,
-        order_date=order.order_date,
-        created_at=order.created_at,
-        updated_at=order.updated_at,
-        line_items=line_items
-    )
+def generate_order_number() -> str:
+    """Generate unique order number."""
+    now = datetime.now()
+    return f"SO-{now.strftime('%Y%m%d%H%M%S')}"
 
 
 @router.get("", response_model=OrderListResponse)
-async def list_orders(
-    db: DBSession,
-    current_user: CurrentUser,
+def list_orders(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
-    status: Optional[OrderStatus] = None,
-    customer_id: Optional[int] = None,
-    date_from: Optional[datetime] = None,
-    date_to: Optional[datetime] = None
+    order_status: Optional[str] = None,
+    customer_id: Optional[UUID] = None,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
 ):
-    """
-    List all orders with pagination and filters.
-    """
-    query = db.query(SalesOrder)
+    """List orders with filtering."""
+    query = db.query(SalesOrder).filter(SalesOrder.deleted_at == None)
     
-    if status:
-        query = query.filter(SalesOrder.status == status)
-    
+    if order_status:
+        query = query.filter(SalesOrder.status == OrderStatus(order_status))
     if customer_id:
         query = query.filter(SalesOrder.customer_id == customer_id)
     
-    if date_from:
-        query = query.filter(SalesOrder.order_date >= date_from)
-    
-    if date_to:
-        query = query.filter(SalesOrder.order_date <= date_to)
-    
+    query = query.order_by(SalesOrder.order_date.desc())
     total = query.count()
-    orders = query.order_by(SalesOrder.created_at.desc()).offset((page - 1) * size).limit(size).all()
+    items = query.offset((page - 1) * size).limit(size).all()
     
-    items = [build_order_response(order, db) for order in orders]
-    
-    return OrderListResponse(items=items, total=total, page=page, size=size)
+    return OrderListResponse(items=items, total=total)
 
 
 @router.post("", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
-async def create_order(request: OrderCreate, db: DBSession, current_user: CurrentUser):
-    """
-    Create a new order (draft status).
-    """
-    # Validate customer exists
-    customer = db.query(Customer).filter(Customer.id == request.customer_id).first()
+def create_order(
+    data: OrderCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Create a new order."""
+    # Verify customer exists
+    customer = db.query(Customer).filter(Customer.id == data.customer_id).first()
     if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
+        raise HTTPException(status_code=400, detail="Customer not found")
     
     # Create order
     order = SalesOrder(
-        order_number=generate_order_number(db),
-        customer_id=request.customer_id,
+        order_number=generate_order_number(),
+        customer_id=data.customer_id,
         created_by=current_user.id,
-        status=OrderStatus.DRAFT,
-        discount=request.discount,
-        notes=request.notes,
-        order_date=request.order_date or datetime.now()
+        discount=data.discount,
+        notes=data.notes
     )
     db.add(order)
     db.flush()
     
     # Add line items
-    for line_data in request.line_items:
-        product = db.query(Product).filter(Product.id == line_data.product_id).first()
+    for item_data in data.line_items:
+        product = db.query(Product).filter(Product.id == item_data.product_id).first()
         if not product:
-            raise HTTPException(status_code=404, detail=f"Product {line_data.product_id} not found")
+            raise HTTPException(status_code=400, detail=f"Product {item_data.product_id} not found")
         
-        line_total = (line_data.quantity * line_data.unit_price) - line_data.discount
-        line = OrderLine(
+        line_item = SalesOrderItem(
             order_id=order.id,
-            product_id=line_data.product_id,
-            quantity=line_data.quantity,
-            unit_price=line_data.unit_price,
-            discount=line_data.discount,
-            line_total=line_total
+            product_id=item_data.product_id,
+            quantity=item_data.quantity,
+            unit_price=item_data.unit_price,
+            discount=item_data.discount,
+            line_total=(item_data.unit_price * item_data.quantity) - item_data.discount
         )
-        db.add(line)
+        db.add(line_item)
     
     db.flush()
-    calculate_order_totals(order)
+    order.calculate_totals()
     db.commit()
     db.refresh(order)
-    
-    # Audit log
-    log_create(db, current_user.id, "order", order.id, {
-        "order_number": order.order_number,
-        "customer_id": order.customer_id,
-        "total": str(order.total)
-    })
-    
-    return build_order_response(order, db)
+    return order
 
 
 @router.get("/{order_id}", response_model=OrderResponse)
-async def get_order(order_id: int, db: DBSession, current_user: CurrentUser):
-    """
-    Get a specific order by ID.
-    """
-    order = db.query(SalesOrder).filter(SalesOrder.id == order_id).first()
+def get_order(
+    order_id: UUID,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Get a single order with line items."""
+    order = db.query(SalesOrder).filter(
+        SalesOrder.id == order_id,
+        SalesOrder.deleted_at == None
+    ).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    
-    return build_order_response(order, db)
-
-
-@router.put("/{order_id}", response_model=OrderResponse)
-async def update_order(order_id: int, request: OrderUpdate, db: DBSession, current_user: CurrentUser):
-    """
-    Update an order (only in draft status).
-    """
-    order = db.query(SalesOrder).filter(SalesOrder.id == order_id).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-    
-    if order.status != OrderStatus.DRAFT:
-        raise HTTPException(
-            status_code=400,
-            detail="Only draft orders can be updated"
-        )
-    
-    old_values = {
-        "customer_id": order.customer_id,
-        "discount": str(order.discount),
-        "notes": order.notes
-    }
-    
-    if request.customer_id is not None:
-        customer = db.query(Customer).filter(Customer.id == request.customer_id).first()
-        if not customer:
-            raise HTTPException(status_code=404, detail="Customer not found")
-        order.customer_id = request.customer_id
-    
-    if request.discount is not None:
-        order.discount = request.discount
-    
-    if request.notes is not None:
-        order.notes = request.notes
-    
-    calculate_order_totals(order)
-    db.commit()
-    db.refresh(order)
-    
-    # Audit log
-    log_update(db, current_user.id, "order", order.id, old_values, request.model_dump(exclude_unset=True))
-    
-    return build_order_response(order, db)
+    return order
 
 
 @router.put("/{order_id}/status", response_model=OrderResponse)
-async def update_order_status(order_id: int, request: OrderStatusUpdate, db: DBSession, current_user: CurrentUser):
-    """
-    Update order status with validation.
-    Status flow: draft -> confirmed -> shipped -> completed
-                 draft -> cancelled
-    """
-    order = db.query(SalesOrder).filter(SalesOrder.id == order_id).first()
+def update_order_status(
+    order_id: UUID,
+    data: OrderStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Update order status with workflow validation."""
+    order = db.query(SalesOrder).filter(
+        SalesOrder.id == order_id,
+        SalesOrder.deleted_at == None
+    ).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    old_status = order.status
-    new_status = request.status
+    new_status = OrderStatus(data.status)
     
-    # Validate status transitions
-    valid_transitions = {
-        OrderStatus.DRAFT: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
-        OrderStatus.CONFIRMED: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
-        OrderStatus.SHIPPED: [OrderStatus.COMPLETED],
-        OrderStatus.COMPLETED: [],
-        OrderStatus.CANCELLED: []
-    }
-    
-    if new_status not in valid_transitions.get(old_status, []):
+    if not order.can_transition_to(new_status):
         raise HTTPException(
-            status_code=400,
-            detail=f"Cannot transition from {old_status.value} to {new_status.value}"
+            status_code=400, 
+            detail=f"Cannot transition from {order.status.value} to {new_status.value}"
         )
     
-    # Handle stock deduction on confirm
-    if new_status == OrderStatus.CONFIRMED:
-        for line in order.line_items:
-            product = db.query(Product).filter(Product.id == line.product_id).first()
-            if not product:
-                continue
-            
-            if product.current_stock < line.quantity:
+    # Handle stock changes
+    if new_status == OrderStatus.CONFIRMED and order.status == OrderStatus.DRAFT:
+        # Deduct stock on confirm
+        for item in order.line_items:
+            product = db.query(Product).filter(Product.id == item.product_id).first()
+            if product.current_stock < item.quantity:
                 raise HTTPException(
-                    status_code=400,
-                    detail=f"Insufficient stock for {product.name}. Available: {product.current_stock}"
+                    status_code=400, 
+                    detail=f"Insufficient stock for {product.sku}"
                 )
             
-            # Create stock movement
             stock_before = product.current_stock
-            product.current_stock -= line.quantity
+            product.current_stock -= item.quantity
             
             movement = StockMovement(
                 product_id=product.id,
-                order_id=order.id,
-                type=StockMovementType.OUT,
-                quantity=line.quantity,
+                created_by=current_user.id,
+                type=MovementType.OUT,
+                quantity=item.quantity,
                 stock_before=stock_before,
                 stock_after=product.current_stock,
-                reason=f"Order {order.order_number}",
-                created_by=current_user.id
+                reason=f"Order {order.order_number}"
             )
             db.add(movement)
-        
-        # Update customer debt
-        customer = db.query(Customer).filter(Customer.id == order.customer_id).first()
-        if customer:
-            customer.total_debt += order.total
     
-    # Handle stock restoration on cancel (if was confirmed)
-    if new_status == OrderStatus.CANCELLED and old_status in [OrderStatus.CONFIRMED, OrderStatus.SHIPPED]:
-        for line in order.line_items:
-            product = db.query(Product).filter(Product.id == line.product_id).first()
-            if not product:
-                continue
-            
+    elif new_status == OrderStatus.CANCELLED and order.status == OrderStatus.CONFIRMED:
+        # Restore stock on cancel
+        for item in order.line_items:
+            product = db.query(Product).filter(Product.id == item.product_id).first()
             stock_before = product.current_stock
-            product.current_stock += line.quantity
+            product.current_stock += item.quantity
             
             movement = StockMovement(
                 product_id=product.id,
-                order_id=order.id,
-                type=StockMovementType.IN,
-                quantity=line.quantity,
+                created_by=current_user.id,
+                type=MovementType.IN,
+                quantity=item.quantity,
                 stock_before=stock_before,
                 stock_after=product.current_stock,
-                reason=f"Order {order.order_number} cancelled",
-                created_by=current_user.id
+                reason=f"Cancelled order {order.order_number}"
             )
             db.add(movement)
-        
-        # Reduce customer debt
-        customer = db.query(Customer).filter(Customer.id == order.customer_id).first()
-        if customer:
-            customer.total_debt -= (order.total - order.paid_amount)
     
     order.status = new_status
     db.commit()
     db.refresh(order)
-    
-    # Audit log
-    log_update(db, current_user.id, "order", order.id, 
-               {"status": old_status.value}, 
-               {"status": new_status.value})
-    
-    return build_order_response(order, db)
+    return order
 
 
-@router.delete("/{order_id}")
-async def cancel_order(order_id: int, db: DBSession, current_user: CurrentUser):
-    """
-    Cancel an order (sets status to cancelled).
-    """
-    order = db.query(SalesOrder).filter(SalesOrder.id == order_id).first()
+@router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_order(
+    order_id: UUID,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Soft delete an order."""
+    order = db.query(SalesOrder).filter(
+        SalesOrder.id == order_id,
+        SalesOrder.deleted_at == None
+    ).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    if order.status in [OrderStatus.COMPLETED, OrderStatus.CANCELLED]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot cancel order in {order.status.value} status"
-        )
-    
-    # Use status update logic
-    return await update_order_status(
-        order_id, 
-        OrderStatusUpdate(status=OrderStatus.CANCELLED), 
-        db, 
-        current_user
-    )
+    order.deleted_at = datetime.utcnow()
+    db.commit()
+    return None

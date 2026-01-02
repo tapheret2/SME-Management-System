@@ -1,4 +1,4 @@
-"""Customer schemas with UUID support."""
+"""Customer schemas."""
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -40,7 +40,8 @@ class CustomerResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True
 
 
 class CustomerListResponse(BaseModel):

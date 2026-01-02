@@ -1,4 +1,4 @@
-"""Order schemas with UUID support."""
+"""Order schemas."""
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -13,26 +13,17 @@ class OrderLineCreate(BaseModel):
     discount: Decimal = Field(default=Decimal("0"), ge=0)
 
 
-class OrderLineUpdate(BaseModel):
-    quantity: Optional[int] = Field(None, gt=0)
-    unit_price: Optional[Decimal] = Field(None, ge=0)
-    discount: Optional[Decimal] = Field(None, ge=0)
-
-
 class OrderLineResponse(BaseModel):
     id: UUID
-    order_id: UUID
     product_id: UUID
-    product_sku: Optional[str] = None
-    product_name: Optional[str] = None
     quantity: int
     unit_price: Decimal
     discount: Decimal
     line_total: Decimal
     created_at: datetime
-    updated_at: datetime
     
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True
 
 
 class OrderCreate(BaseModel):
@@ -55,9 +46,7 @@ class OrderResponse(BaseModel):
     id: UUID
     order_number: str
     customer_id: UUID
-    customer_name: Optional[str] = None
     created_by: UUID
-    creator_name: Optional[str] = None
     status: str
     subtotal: Decimal
     discount: Decimal
@@ -69,24 +58,22 @@ class OrderResponse(BaseModel):
     line_items: list[OrderLineResponse] = []
     created_at: datetime
     updated_at: datetime
-    deleted_at: Optional[datetime] = None
     
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True
 
 
 class OrderListItem(BaseModel):
     id: UUID
     order_number: str
     customer_id: UUID
-    customer_name: Optional[str] = None
     status: str
     total: Decimal
     paid_amount: Decimal
-    remaining_amount: Decimal
     order_date: datetime
-    created_at: datetime
     
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True
 
 
 class OrderListResponse(BaseModel):
