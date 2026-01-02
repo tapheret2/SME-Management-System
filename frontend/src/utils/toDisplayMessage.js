@@ -4,8 +4,10 @@
  */
 export const toDisplayMessage = (error) => {
     try {
-        if (!error) return 'Đã xảy ra lỗi không xác định.';
+        if (error === null || error === undefined) return 'Lỗi không xác định (null)';
         if (typeof error === 'string') return error;
+        if (typeof error === 'number') return String(error);
+        if (typeof error === 'boolean') return String(error);
 
         // 1. Check for Axios/API response error structure
         const detail = error.response?.data?.detail;
@@ -16,16 +18,17 @@ export const toDisplayMessage = (error) => {
             // Case B: Detail is an array (e.g. Pydantic validation errors)
             if (Array.isArray(detail)) {
                 return detail.map(item => {
+                    if (item === null || item === undefined) return '';
                     if (typeof item === 'string') return item;
-                    if (item && typeof item === 'object') {
-                        // Extract field path if available (e.g. loc: ['body', 'line_items', 0, 'quantity'])
+                    if (typeof item === 'object') {
+                        // Extract field path
                         let prefix = '';
                         if (item.loc && Array.isArray(item.loc)) {
-                            // meaningful path usually starts after 'body'
+                            // Filter out 'body' or other generic keywords if desired
                             const path = item.loc.filter(p => p !== 'body').join('.');
                             if (path) prefix = `${path}: `;
                         }
-                        return `${prefix}${item.msg || item.message || JSON.stringify(item)}`;
+                        return `${prefix}${String(item.msg || item.message || JSON.stringify(item))}`;
                     }
                     return String(item);
                 }).join('\n');
@@ -33,7 +36,7 @@ export const toDisplayMessage = (error) => {
 
             // Case C: Detail is a single object
             if (typeof detail === 'object') {
-                return detail.msg || detail.message || JSON.stringify(detail);
+                return String(detail.msg || detail.message || JSON.stringify(detail));
             }
         }
 
@@ -42,8 +45,14 @@ export const toDisplayMessage = (error) => {
             return error.message;
         }
 
-        // 3. Fallback for other objects
-        return JSON.stringify(error);
+        // 3. Last resort fallback
+        // If it's a cyclic structure, JSON.stringify might throw.
+        try {
+            return JSON.stringify(error);
+        } catch (jsonError) {
+            return 'Lỗi chi tiết (không thể hiển thị)';
+        }
+
     } catch (e) {
         console.error('Error normalizing message:', e);
         return 'Lỗi hệ thống (parse error)';
