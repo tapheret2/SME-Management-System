@@ -6,9 +6,16 @@ from pydantic import BaseModel
 
 class DashboardMetrics(BaseModel):
     today_revenue: Decimal
-    today_orders: int
+    today_collected: Decimal
+    today_debt: Decimal
+    today_profit: Decimal
+    today_count: int
     month_revenue: Decimal
-    month_orders: int
+    month_collected: Decimal
+    month_debt: Decimal
+    month_profit: Decimal
+    month_count: int
+    month_import_cost: Decimal
     total_receivables: Decimal
     total_payables: Decimal
     debtor_count: int

@@ -121,7 +121,7 @@ export default function Customers() {
                                         <td className="table-cell text-gray-500">{item.phone || '-'}</td>
                                         <td className="table-cell text-gray-500">{item.email || '-'}</td>
                                         <td className="table-cell text-right">
-                                            <span className={Number(item.total_debt) > 0 ? 'text-red-600 font-medium' : ''}>
+                                            <span className={Number(item.total_debt) < 0 ? 'text-red-600 font-medium' : ''}>
                                                 {formatVND(item.total_debt)}
                                             </span>
                                         </td>

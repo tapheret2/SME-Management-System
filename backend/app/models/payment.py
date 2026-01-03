@@ -1,7 +1,7 @@
 """Payment model."""
 import enum
 from decimal import Decimal
-from sqlalchemy import Column, String, Text, Numeric, Enum, ForeignKey, Index, DateTime
+from sqlalchemy import Column, String, Text, Numeric, Enum, ForeignKey, Index, DateTime, Boolean
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -29,7 +29,8 @@ class Payment(Base, UUIDMixin, TimestampMixin):
     supplier_id = Column(UUID(), ForeignKey("suppliers.id"), nullable=True)
     order_id = Column(UUID(), ForeignKey("sales_orders.id"), nullable=True)
     created_by = Column(UUID(), ForeignKey("users.id"), nullable=False)
-    amount = Column(Numeric(15, 0), nullable=False)
+    amount = Column(Numeric(15, 2), nullable=False)
+    is_settlement = Column(Boolean, default=False)
     notes = Column(Text, nullable=True)
     payment_date = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     

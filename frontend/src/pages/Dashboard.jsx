@@ -5,7 +5,12 @@ import { getLowStockProducts } from '../api/products';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 function formatVND(value) {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
+    const num = Number(value) || 0;
+    // Format with compact notation for large numbers
+    if (num >= 1000000000) {
+        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', notation: 'compact', maximumFractionDigits: 1 }).format(num);
+    }
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num);
 }
 
 function MetricCard({ title, value, subValue, icon, color = 'primary' }) {
@@ -18,16 +23,16 @@ function MetricCard({ title, value, subValue, icon, color = 'primary' }) {
 
     return (
         <div className="card">
-            <div className="flex items-center">
-                <div className={`p-3 rounded-lg ${colors[color]}`}>
+            <div className="flex items-start">
+                <div className={`p-3 rounded-lg flex-shrink-0 ${colors[color]}`}>
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
                     </svg>
                 </div>
-                <div className="ml-4">
+                <div className="ml-3 min-w-0">
                     <p className="text-sm font-medium text-gray-500">{title}</p>
-                    <p className="text-2xl font-bold text-gray-900">{value}</p>
-                    {subValue && <p className="text-sm text-gray-500">{subValue}</p>}
+                    <p className="text-lg font-bold text-gray-900 break-words">{value}</p>
+                    {subValue && <p className="text-xs text-gray-500">{subValue}</p>}
                 </div>
             </div>
         </div>
@@ -65,33 +70,40 @@ export default function Dashboard() {
                 <p className="text-gray-500">Tổng quan hoạt động kinh doanh</p>
             </div>
 
-            {/* Metrics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Key Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <MetricCard
-                    title="Doanh thu hôm nay"
-                    value={formatVND(metrics?.today_revenue || 0)}
-                    subValue={`${metrics?.today_orders || 0} đơn hàng`}
+                    title="Doanh thu tháng này"
+                    value={formatVND(metrics?.month_revenue || 0)}
+                    subValue={`${metrics?.month_count || 0} đơn hàng`}
                     icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                     color="primary"
                 />
                 <MetricCard
-                    title="Doanh thu tháng"
-                    value={formatVND(metrics?.month_revenue || 0)}
-                    subValue={`${metrics?.month_orders || 0} đơn hàng`}
-                    icon="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                    title="Lợi nhuận tháng này"
+                    value={formatVND(metrics?.month_profit || 0)}
+                    subValue="Sau giá vốn"
+                    icon="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
                     color="green"
+                />
+                <MetricCard
+                    title="Tiền nhập hàng tháng"
+                    value={formatVND(metrics?.month_import_cost || 0)}
+                    subValue="Tổng giá trị nhập kho"
+                    icon="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                    color="yellow"
                 />
                 <MetricCard
                     title="Công nợ phải thu"
                     value={formatVND(metrics?.total_receivables || 0)}
                     subValue={`${metrics?.debtor_count || 0} khách hàng`}
                     icon="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                    color="yellow"
+                    color="red"
                 />
                 <MetricCard
                     title="Cảnh báo tồn kho"
                     value={metrics?.low_stock_count || 0}
-                    subValue={`${metrics?.total_products || 0} sản phẩm tổng`}
+                    subValue={`${metrics?.total_products || 0} sản phẩm`}
                     icon="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                     color={metrics?.low_stock_count > 0 ? 'red' : 'green'}
                 />

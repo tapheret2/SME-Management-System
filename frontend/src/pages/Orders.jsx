@@ -90,6 +90,10 @@ export default function Orders() {
         mutationFn: createOrder,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['orders'] });
+            queryClient.invalidateQueries({ queryKey: ['products-inventory'] });
+            queryClient.invalidateQueries({ queryKey: ['low-stock-products'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
+            queryClient.invalidateQueries({ queryKey: ['inventory-valuation'] });
             toast.success('Tạo đơn hàng thành công!');
             setIsModalOpen(false);
             setNewOrder({ customer_id: '', line_items: [], discount: 0 });
@@ -104,6 +108,11 @@ export default function Orders() {
         mutationFn: ({ id, status }) => updateOrderStatus(id, status),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['orders'] });
+            queryClient.invalidateQueries({ queryKey: ['products-inventory'] });
+            queryClient.invalidateQueries({ queryKey: ['low-stock-products'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
+            queryClient.invalidateQueries({ queryKey: ['inventory-valuation'] });
+            queryClient.invalidateQueries({ queryKey: ['customers'] });
             toast.success('Cập nhật trạng thái thành công!');
         },
         onError: (error) => {

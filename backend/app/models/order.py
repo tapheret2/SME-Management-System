@@ -83,11 +83,21 @@ class SalesOrderItem(Base, UUIDMixin, TimestampMixin):
     product_id = Column(UUID(), ForeignKey("products.id"), nullable=False)
     quantity = Column(Integer, nullable=False)
     unit_price = Column(Numeric(15, 0), nullable=False)
+    cost_price = Column(Numeric(15, 0), default=Decimal("0"), nullable=False)
     discount = Column(Numeric(15, 0), default=Decimal("0"), nullable=False)
     line_total = Column(Numeric(15, 0), nullable=False)
     
     # Relationships
     order = relationship("SalesOrder", back_populates="line_items")
+    product = relationship("Product")
+    
+    @property
+    def product_name(self) -> str:
+        return self.product.name if self.product else "Unknown Product"
+
+    @property
+    def product_sku(self) -> str:
+        return self.product.sku if self.product else "N/A"
     
     __table_args__ = (
         Index("idx_order_items_order_id", "order_id"),

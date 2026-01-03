@@ -12,6 +12,7 @@ from app.models.product import Product
 from app.models.customer import Customer
 from app.models.supplier import Supplier
 from app.models.order import SalesOrder, SalesOrderItem, OrderStatus
+from app.models.stock import StockMovement, MovementType
 from app.schemas.reports import DashboardMetrics, RevenueDataPoint, RevenueReport, TopProductItem, TopProductsReport
 from app.api.deps import get_current_user
 
@@ -33,26 +34,62 @@ def get_dashboard_metrics(
         func.date(SalesOrder.order_date) == today,
         SalesOrder.status.in_([OrderStatus.CONFIRMED, OrderStatus.SHIPPED, OrderStatus.COMPLETED]),
         SalesOrder.deleted_at == None
-    )
-    today_revenue = sum(o.total for o in today_orders) or Decimal("0")
-    today_count = today_orders.count()
+    ).all()
     
+    # Doanh thu = Tổng tiền chốt (Gross sales)
+    today_revenue = sum(o.total for o in today_orders) or Decimal("0")
+    # Tiền nợ mới = Tổng nợ từ đơn hàng
+    today_debt = sum(o.remaining_amount for o in today_orders) or Decimal("0")
+    # Thực thu = Số tiền khách đã trả
+    today_collected = sum(o.paid_amount for o in today_orders) or Decimal("0")
+    today_count = len(today_orders)
+    
+    today_profit = Decimal("0")
+    for order in today_orders:
+        for item in order.line_items:
+            today_profit += (item.line_total - (item.cost_price * item.quantity))
+
     # Month metrics
     month_orders = db.query(SalesOrder).filter(
         func.date(SalesOrder.order_date) >= month_start,
         SalesOrder.status.in_([OrderStatus.CONFIRMED, OrderStatus.SHIPPED, OrderStatus.COMPLETED]),
         SalesOrder.deleted_at == None
-    )
+    ).all()
+    
     month_revenue = sum(o.total for o in month_orders) or Decimal("0")
-    month_count = month_orders.count()
+    month_debt = sum(o.remaining_amount for o in month_orders) or Decimal("0")
+    month_collected = sum(o.paid_amount for o in month_orders) or Decimal("0")
+    month_count = len(month_orders)
     
-    # Receivables/Payables (Net totals based on settlement direction)
-    total_receivables = db.query(func.coalesce(func.sum(Customer.total_debt), 0)).filter(Customer.total_debt < 0).scalar()
-    debtor_count = db.query(Customer).filter(Customer.total_debt < 0).count()
+    month_profit = Decimal("0")
+    for order in month_orders:
+        for item in order.line_items:
+            month_profit += (item.line_total - (item.cost_price * item.quantity))
+
+    # Receivables/Payables (Cross-entity) - Return as Absolute for UI
+    c_receivables = db.query(func.coalesce(func.sum(Customer.total_debt), 0)).filter(Customer.total_debt < 0).scalar()
+    s_receivables = db.query(func.coalesce(func.sum(Supplier.total_payable), 0)).filter(Supplier.total_payable < 0).scalar()
+    total_receivables = abs(Decimal(str(c_receivables or 0)) + Decimal(str(s_receivables or 0)))
+    debtor_count = db.query(Customer).filter(Customer.total_debt < 0).count() + db.query(Supplier).filter(Supplier.total_payable < 0).count()
     
-    total_payables = db.query(func.coalesce(func.sum(Supplier.total_payable), 0)).filter(Supplier.total_payable > 0).scalar()
-    creditor_count = db.query(Supplier).filter(Supplier.total_payable > 0).count()
+    s_payables = db.query(func.coalesce(func.sum(Supplier.total_payable), 0)).filter(Supplier.total_payable > 0).scalar()
+    c_payables = db.query(func.coalesce(func.sum(Customer.total_debt), 0)).filter(Customer.total_debt > 0).scalar()
+    total_payables = abs(Decimal(str(s_payables or 0)) + Decimal(str(c_payables or 0)))
+    creditor_count = db.query(Supplier).filter(Supplier.total_payable > 0).count() + db.query(Customer).filter(Customer.total_debt > 0).count()
     
+    # Month Import Cost (Stock IN movements × cost_price)
+    from sqlalchemy.orm import joinedload
+    month_imports = db.query(StockMovement).filter(
+        func.date(StockMovement.created_at) >= month_start,
+        StockMovement.type == MovementType.IN
+    ).all()
+    
+    month_import_cost = Decimal("0")
+    for movement in month_imports:
+        product = db.query(Product).filter(Product.id == movement.product_id).first()
+        if product:
+            month_import_cost += product.cost_price * movement.quantity
+
     # Counts
     total_customers = db.query(Customer).count()
     total_products = db.query(Product).filter(Product.is_active == True).count()
@@ -63,11 +100,18 @@ def get_dashboard_metrics(
     
     return DashboardMetrics(
         today_revenue=today_revenue,
-        today_orders=today_count,
+        today_collected=today_collected,
+        today_debt=today_debt,
+        today_profit=today_profit,
+        today_count=today_count,
         month_revenue=month_revenue,
-        month_orders=month_count,
-        total_receivables=Decimal(str(total_receivables or 0)),
-        total_payables=Decimal(str(total_payables or 0)),
+        month_collected=month_collected,
+        month_debt=month_debt,
+        month_profit=month_profit,
+        month_count=month_count,
+        month_import_cost=month_import_cost,
+        total_receivables=total_receivables,
+        total_payables=total_payables,
         debtor_count=debtor_count,
         creditor_count=creditor_count,
         total_customers=total_customers,
@@ -153,3 +197,35 @@ def get_top_products(
     ]
     
     return TopProductsReport(data=data)
+
+
+@router.get("/inventory-valuation")
+def get_inventory_valuation(
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Get inventory valuation (stock × cost_price for each product)."""
+    products = db.query(Product).filter(
+        Product.is_active == True,
+        Product.current_stock > 0
+    ).order_by(Product.current_stock.desc()).all()
+    
+    data = []
+    total_value = Decimal("0")
+    
+    for p in products:
+        item_value = p.cost_price * p.current_stock
+        total_value += item_value
+        data.append({
+            "product_id": str(p.id),
+            "product_sku": p.sku,
+            "product_name": p.name,
+            "current_stock": p.current_stock,
+            "cost_price": p.cost_price,
+            "total_value": item_value
+        })
+    
+    return {
+        "data": data,
+        "total_value": total_value
+    }

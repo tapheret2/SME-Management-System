@@ -80,6 +80,7 @@ def create_payment(
         order_id=data.order_id,
         created_by=current_user.id,
         amount=data.amount,
+        is_settlement=data.is_settlement,
         notes=data.notes
     )
     db.add(payment)
@@ -88,7 +89,10 @@ def create_payment(
     if data.type == "incoming" and data.customer_id:
         customer = db.query(Customer).filter(Customer.id == data.customer_id).first()
         if customer:
-            customer.total_debt += data.amount  # ADD to a negative debt to settle it
+            if data.is_settlement:
+                customer.total_debt += data.amount  # ADD to settle negative debt
+            else:
+                customer.total_debt -= data.amount  # SUBTRACT to create negative debt
     
     # Update order paid_amount if linked
     if data.order_id:
@@ -100,7 +104,10 @@ def create_payment(
     if data.type == "outgoing" and data.supplier_id:
         supplier = db.query(Supplier).filter(Supplier.id == data.supplier_id).first()
         if supplier:
-            supplier.total_payable -= data.amount  # SUBTRACT from a positive payable to settle it
+            if data.is_settlement:
+                supplier.total_payable -= data.amount  # SUBTRACT to settle positive payable
+            else:
+                supplier.total_payable += data.amount  # ADD to create positive payable
     
     db.commit()
     db.refresh(payment)
@@ -113,18 +120,28 @@ def get_arap_summary(
     _current_user = Depends(get_current_user)
 ):
     """Get accounts receivable/payable summary."""
-    # Total receivables (customer debts - we expect negative values)
-    receivables = db.query(func.coalesce(func.sum(Customer.total_debt), 0)).filter(Customer.total_debt < 0).scalar()
-    customer_count = db.query(Customer).filter(Customer.total_debt < 0).count()
+    # Total receivables (sum of all negative debts/payables)
+    c_receivables = db.query(func.coalesce(func.sum(Customer.total_debt), 0)).filter(Customer.total_debt < 0).scalar()
+    s_receivables = db.query(func.coalesce(func.sum(Supplier.total_payable), 0)).filter(Supplier.total_payable < 0).scalar()
+    receivables = Decimal(str(c_receivables or 0)) + Decimal(str(s_receivables or 0))
     
-    # Total payables (supplier debts - we expect positive values)
-    payables = db.query(func.coalesce(func.sum(Supplier.total_payable), 0)).filter(Supplier.total_payable > 0).scalar()
-    supplier_count = db.query(Supplier).filter(Supplier.total_payable > 0).count()
+    c_debtor_count = db.query(Customer).filter(Customer.total_debt < 0).count()
+    s_debtor_count = db.query(Supplier).filter(Supplier.total_payable < 0).count()
+    customer_count = c_debtor_count + s_debtor_count
+    
+    # Total payables (sum of all positive debts/payables)
+    s_payables = db.query(func.coalesce(func.sum(Supplier.total_payable), 0)).filter(Supplier.total_payable > 0).scalar()
+    c_payables = db.query(func.coalesce(func.sum(Customer.total_debt), 0)).filter(Customer.total_debt > 0).scalar()
+    payables = Decimal(str(s_payables or 0)) + Decimal(str(c_payables or 0))
+    
+    s_creditor_count = db.query(Supplier).filter(Supplier.total_payable > 0).count()
+    c_creditor_count = db.query(Customer).filter(Customer.total_debt > 0).count()
+    supplier_count = s_creditor_count + c_creditor_count
     
     return ARAPSummary(
-        total_receivables=Decimal(str(receivables or 0)),
+        total_receivables=receivables,
         customer_count=customer_count,
-        total_payables=Decimal(str(payables or 0)),
+        total_payables=payables,
         supplier_count=supplier_count
     )
 
@@ -157,7 +174,10 @@ def delete_payment(
     if str(payment.type) == "incoming" and payment.customer_id:
         customer = db.query(Customer).filter(Customer.id == payment.customer_id).first()
         if customer:
-            customer.total_debt -= payment.amount
+            if payment.is_settlement:
+                customer.total_debt -= payment.amount
+            else:
+                customer.total_debt += payment.amount
     
     # Reverse order paid_amount if linked
     if payment.order_id:
@@ -169,7 +189,10 @@ def delete_payment(
     if str(payment.type) == "outgoing" and payment.supplier_id:
         supplier = db.query(Supplier).filter(Supplier.id == payment.supplier_id).first()
         if supplier:
-            supplier.total_payable += payment.amount
+            if payment.is_settlement:
+                supplier.total_payable += payment.amount
+            else:
+                supplier.total_payable -= payment.amount
     
     db.delete(payment)
     db.commit()

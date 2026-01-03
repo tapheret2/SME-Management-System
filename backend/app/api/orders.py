@@ -92,6 +92,7 @@ def create_order(
                 product_id=item_data.product_id,
                 quantity=item_data.quantity,
                 unit_price=item_data.unit_price,
+                cost_price=product.cost_price,
                 discount=item_data.discount,
                 line_total=(item_data.unit_price * item_data.quantity) - item_data.discount
             )

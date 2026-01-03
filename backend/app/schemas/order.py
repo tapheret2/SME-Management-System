@@ -16,6 +16,8 @@ class OrderLineCreate(BaseModel):
 class OrderLineResponse(BaseModel):
     id: UUID
     product_id: UUID
+    product_name: Optional[str] = None
+    product_sku: Optional[str] = None
     quantity: int
     unit_price: Decimal
     discount: Decimal

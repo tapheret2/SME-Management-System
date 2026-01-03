@@ -13,6 +13,7 @@ class PaymentCreate(BaseModel):
     supplier_id: Optional[UUID] = None
     order_id: Optional[UUID] = None
     amount: Decimal = Field(..., gt=0)
+    is_settlement: bool = Field(default=False)
     notes: Optional[str] = None
 
 
@@ -32,6 +33,7 @@ class PaymentResponse(BaseModel):
     order_id: Optional[UUID] = None
     created_by: UUID
     amount: Decimal
+    is_settlement: bool
     notes: Optional[str] = None
     payment_date: datetime
     created_at: datetime

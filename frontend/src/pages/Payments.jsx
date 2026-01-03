@@ -17,17 +17,17 @@ const methodLabels = { cash: 'Tiền mặt', bank: 'Chuyển khoản', other: 'K
 
 export default function Payments() {
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState('all'); // 'all' | 'receivables' | 'payables'
+    const [activeTab, setActiveTab] = useState('receivables'); // 'receivables' | 'payables'
     const [page, setPage] = useState(1);
     const queryClient = useQueryClient();
     const { register, handleSubmit, reset, watch, formState: { errors } } = useForm();
 
     const paymentType = watch('type');
 
-    const { data: paymentsData, isLoading } = useQuery({
+    const { data: paymentsData, isLoading: paymentsLoading } = useQuery({
         queryKey: ['payments', { page }],
         queryFn: () => getPayments({ page, size: 20 }),
-        enabled: activeTab === 'all',
+        enabled: false, // Disabled as per user request to remove "All" tab
     });
 
     const { data: arapData } = useQuery({
@@ -86,7 +86,7 @@ export default function Payments() {
     });
 
     const openModal = () => {
-        reset({ type: 'incoming', method: 'cash', amount: '', customer_id: '', supplier_id: '', notes: '' });
+        reset({ type: 'incoming', method: 'cash', amount: '', customer_id: '', supplier_id: '', is_settlement: false, notes: '' });
         setIsModalOpen(true);
     };
 
@@ -100,6 +100,7 @@ export default function Payments() {
             type: data.type,
             method: data.method,
             amount: Number(data.amount),
+            is_settlement: data.is_settlement === 'true' || data.is_settlement === true,
             notes: data.notes || undefined,
         };
         if (data.type === 'incoming') {
@@ -124,7 +125,6 @@ export default function Payments() {
             <div className="border-b border-gray-200">
                 <nav className="-mb-px flex space-x-8">
                     {[
-                        { id: 'all', label: 'Tất cả' },
                         { id: 'receivables', label: 'Phải thu (AR)' },
                         { id: 'payables', label: 'Phải trả (AP)' },
                     ].map(tab => (
@@ -143,53 +143,7 @@ export default function Payments() {
             </div>
 
             {/* Content based on tab */}
-            {activeTab === 'all' && (
-                <div className="card overflow-hidden p-0">
-                    {isLoading ? (
-                        <div className="flex items-center justify-center h-64">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="table-header">Mã phiếu</th>
-                                        <th className="table-header">Loại</th>
-                                        <th className="table-header">Đối tượng</th>
-                                        <th className="table-header text-right">Số tiền</th>
-                                        <th className="table-header">PT thanh toán</th>
-                                        <th className="table-header">Ngày</th>
-                                        <th className="table-header text-right">Thao tác</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200">
-                                    {paymentsData?.items?.map(payment => (
-                                        <tr key={payment.id} className="hover:bg-gray-50">
-                                            <td className="table-cell font-medium">{payment.payment_number}</td>
-                                            <td className="table-cell">
-                                                <span className={`badge ${payment.type === 'incoming' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                                    {typeLabels[payment.type]}
-                                                </span>
-                                            </td>
-                                            <td className="table-cell">{payment.customer_name || payment.supplier_name}</td>
-                                            <td className="table-cell text-right font-medium">{formatVND(payment.amount)}</td>
-                                            <td className="table-cell text-gray-500">{methodLabels[payment.method]}</td>
-                                            <td className="table-cell text-gray-500">{format(new Date(payment.payment_date), 'dd/MM/yyyy')}</td>
-                                            <td className="table-cell text-right">
-                                                <button
-                                                    onClick={() => { if (confirm('Xác nhận xóa phiếu thanh toán này?')) deleteMutation.mutate(payment.id); }}
-                                                    className="text-red-600 hover:text-red-800"
-                                                >Xóa</button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            )}
+
 
             {activeTab === 'receivables' && (
                 <div className="card">
@@ -201,22 +155,40 @@ export default function Payments() {
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    <th className="table-header">Mã KH</th>
-                                    <th className="table-header">Tên khách hàng</th>
+                                    <th className="table-header">Mã ĐT</th>
+                                    <th className="table-header">Tên đối tượng</th>
                                     <th className="table-header text-right">Công nợ</th>
                                     <th className="table-header text-right">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
+                                {/* Customers with negative debt */}
                                 {customersWithDebt?.items?.filter(c => Number(c.total_debt) < 0).map(item => (
                                     <tr key={item.id} className="hover:bg-gray-50">
                                         <td className="table-cell font-medium">{item.code}</td>
-                                        <td className="table-cell">{item.name}</td>
+                                        <td className="table-cell">{item.name} <span className="text-xs text-gray-400">(KH)</span></td>
                                         <td className="table-cell text-right font-medium text-red-600">{formatVND(item.total_debt)}</td>
                                         <td className="table-cell text-right">
                                             <button
                                                 onClick={() => {
-                                                    reset({ type: 'incoming', method: 'cash', amount: Math.abs(item.total_debt), customer_id: item.id, supplier_id: '', notes: '' });
+                                                    reset({ type: 'incoming', method: 'cash', amount: Math.abs(item.total_debt), customer_id: item.id, supplier_id: '', is_settlement: true, notes: '' });
+                                                    setIsModalOpen(true);
+                                                }}
+                                                className="text-green-600 hover:text-green-800 font-medium"
+                                            >Thu tiền</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {/* Suppliers with negative payable (they owe us) */}
+                                {suppliersWithPayable?.items?.filter(s => Number(s.total_payable) < 0).map(item => (
+                                    <tr key={item.id} className="hover:bg-gray-50">
+                                        <td className="table-cell font-medium">{item.code}</td>
+                                        <td className="table-cell">{item.name} <span className="text-xs text-gray-400">(NCC)</span></td>
+                                        <td className="table-cell text-right font-medium text-red-600">{formatVND(item.total_payable)}</td>
+                                        <td className="table-cell text-right">
+                                            <button
+                                                onClick={() => {
+                                                    reset({ type: 'incoming', method: 'cash', amount: Math.abs(item.total_payable), customer_id: '', supplier_id: item.id, is_settlement: true, notes: '' });
                                                     setIsModalOpen(true);
                                                 }}
                                                 className="text-green-600 hover:text-green-800 font-medium"
@@ -240,22 +212,40 @@ export default function Payments() {
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    <th className="table-header">Mã NCC</th>
-                                    <th className="table-header">Tên nhà cung cấp</th>
+                                    <th className="table-header">Mã ĐT</th>
+                                    <th className="table-header">Tên đối tượng</th>
                                     <th className="table-header text-right">Công nợ</th>
                                     <th className="table-header text-right">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
+                                {/* Suppliers with positive payable */}
                                 {suppliersWithPayable?.items?.filter(s => Number(s.total_payable) > 0).map(item => (
                                     <tr key={item.id} className="hover:bg-gray-50">
                                         <td className="table-cell font-medium">{item.code}</td>
-                                        <td className="table-cell">{item.name}</td>
+                                        <td className="table-cell">{item.name} <span className="text-xs text-gray-400">(NCC)</span></td>
                                         <td className="table-cell text-right font-medium text-orange-600">{formatVND(item.total_payable)}</td>
                                         <td className="table-cell text-right">
                                             <button
                                                 onClick={() => {
-                                                    reset({ type: 'outgoing', method: 'cash', amount: Math.abs(item.total_payable), customer_id: '', supplier_id: item.id, notes: '' });
+                                                    reset({ type: 'outgoing', method: 'cash', amount: Math.abs(item.total_payable), customer_id: '', supplier_id: item.id, is_settlement: true, notes: '' });
+                                                    setIsModalOpen(true);
+                                                }}
+                                                className="text-blue-600 hover:text-blue-800 font-medium"
+                                            >Thanh toán</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {/* Customers with positive debt (we owe them / prepayment) */}
+                                {customersWithDebt?.items?.filter(c => Number(c.total_debt) > 0).map(item => (
+                                    <tr key={item.id} className="hover:bg-gray-50">
+                                        <td className="table-cell font-medium">{item.code}</td>
+                                        <td className="table-cell">{item.name} <span className="text-xs text-gray-400">(KH)</span></td>
+                                        <td className="table-cell text-right font-medium text-orange-600">{formatVND(item.total_debt)}</td>
+                                        <td className="table-cell text-right">
+                                            <button
+                                                onClick={() => {
+                                                    reset({ type: 'outgoing', method: 'cash', amount: Math.abs(item.total_debt), customer_id: item.id, supplier_id: '', is_settlement: true, notes: '' });
                                                     setIsModalOpen(true);
                                                 }}
                                                 className="text-blue-600 hover:text-blue-800 font-medium"
@@ -282,8 +272,15 @@ export default function Payments() {
                                 <div>
                                     <label className="form-label">Loại *</label>
                                     <select {...register('type', { required: true })} className="form-input">
-                                        <option value="incoming">Thu (từ khách hàng)</option>
-                                        <option value="outgoing">Chi (cho nhà cung cấp)</option>
+                                        <option value="incoming">Phiếu Thu (Khách hàng)</option>
+                                        <option value="outgoing">Phiếu Chi (Nhà cung cấp)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="form-label">Nghiệp vụ *</label>
+                                    <select {...register('is_settlement', { required: true })} className="form-input">
+                                        <option value="false">Ghi nợ (Tạo khoản nợ mới)</option>
+                                        <option value="true">Tất toán (Thu/Trả tiền nợ)</option>
                                     </select>
                                 </div>
                                 {paymentType === 'incoming' ? (

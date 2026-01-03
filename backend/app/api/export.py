@@ -33,7 +33,7 @@ def export_products(
         output = StringIO()
         # output.write('\ufeff') # Removed BOM to avoid proxy issues
         writer = csv.writer(output)
-        writer.writerow(["SKU", "Tên sản phẩm", "Danh mục", "Đơn vị", "Giá vốn", "Giá bán", "Tồn kho", "Tồn tối thiểu"])
+        writer.writerow(["SKU", "Ten san pham", "Danh muc", "Don vi", "Gia von", "Gia ban", "Ton kho", "Ton toi thieu"])
         
         for p in products:
             try:
@@ -70,7 +70,7 @@ def export_orders(
         output = StringIO()
         # output.write('\ufeff')
         writer = csv.writer(output)
-        writer.writerow(["Mã đơn", "Ngày đặt", "Trạng thái", "Tổng tiền", "Đã thanh toán", "Còn lại", "Ghi chú"])
+        writer.writerow(["Ma don", "Ngay dat", "Trang thai", "Tong tien", "Da thanh toan", "Con lai", "Ghi chu"])
         
         for o in orders:
             try:
@@ -117,7 +117,7 @@ def export_payments(
         output = StringIO()
         # output.write('\ufeff')
         writer = csv.writer(output)
-        writer.writerow(["Mã phiếu", "Ngày", "Loại", "Phương thức", "Số tiền", "Ghi chú"])
+        writer.writerow(["Ma phieu", "Ngay", "Loai", "Phuong thuc", "So tien", "Ghi chu"])
         
         for p in payments:
             try:
