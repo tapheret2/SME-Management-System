@@ -11,7 +11,7 @@
 
 ---
 
-## 🚀 Why Peganyx?
+## 🚀 Why SME Management System?
 
 Managing a growing business with spreadsheets is a recipe for disaster. Stock discrepancies, lost orders, and untracked payments bleed revenue. 
 
@@ -104,8 +104,6 @@ Unauthorized copying of this file, via any medium is strictly prohibited.
 See [LICENSE](LICENSE) for terms.
 
 ---
-
-Need help or customization?
 
 ---
 *Built with ❤️.*
