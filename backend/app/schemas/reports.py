@@ -11,6 +11,8 @@ class DashboardMetrics(BaseModel):
     month_orders: int
     total_receivables: Decimal
     total_payables: Decimal
+    debtor_count: int
+    creditor_count: int
     total_customers: int
     total_products: int
     low_stock_count: int

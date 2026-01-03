@@ -84,11 +84,11 @@ def create_payment(
     )
     db.add(payment)
     
-    # Update customer debt or order paid amount
+    # Update customer debt
     if data.type == "incoming" and data.customer_id:
         customer = db.query(Customer).filter(Customer.id == data.customer_id).first()
         if customer:
-            customer.total_debt += data.amount  # Add to reduce negative debt
+            customer.total_debt += data.amount  # ADD to a negative debt to settle it
     
     # Update order paid_amount if linked
     if data.order_id:
@@ -100,7 +100,7 @@ def create_payment(
     if data.type == "outgoing" and data.supplier_id:
         supplier = db.query(Supplier).filter(Supplier.id == data.supplier_id).first()
         if supplier:
-            supplier.total_payable -= data.amount  # Subtract to reduce positive payable
+            supplier.total_payable -= data.amount  # SUBTRACT from a positive payable to settle it
     
     db.commit()
     db.refresh(payment)
@@ -113,18 +113,18 @@ def get_arap_summary(
     _current_user = Depends(get_current_user)
 ):
     """Get accounts receivable/payable summary."""
-    # Total receivables (customer debts - negative)
-    receivables = db.query(func.coalesce(func.sum(Customer.total_debt), 0)).scalar()
+    # Total receivables (customer debts - we expect negative values)
+    receivables = db.query(func.coalesce(func.sum(Customer.total_debt), 0)).filter(Customer.total_debt < 0).scalar()
     customer_count = db.query(Customer).filter(Customer.total_debt < 0).count()
     
-    # Total payables (supplier debts - positive)
-    payables = db.query(func.coalesce(func.sum(Supplier.total_payable), 0)).scalar()
+    # Total payables (supplier debts - we expect positive values)
+    payables = db.query(func.coalesce(func.sum(Supplier.total_payable), 0)).filter(Supplier.total_payable > 0).scalar()
     supplier_count = db.query(Supplier).filter(Supplier.total_payable > 0).count()
     
     return ARAPSummary(
-        total_receivables=Decimal(str(receivables)),
+        total_receivables=Decimal(str(receivables or 0)),
         customer_count=customer_count,
-        total_payables=Decimal(str(payables)),
+        total_payables=Decimal(str(payables or 0)),
         supplier_count=supplier_count
     )
 
@@ -153,11 +153,10 @@ def delete_payment(
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
     
-    # Reverse customer debt if incoming payment
+    # Reverse customer debt
     if str(payment.type) == "incoming" and payment.customer_id:
         customer = db.query(Customer).filter(Customer.id == payment.customer_id).first()
         if customer:
-            logger.info(f"Reversing debt for customer {customer.id}: {customer.total_debt} -= {payment.amount}")
             customer.total_debt -= payment.amount
     
     # Reverse order paid_amount if linked
@@ -166,11 +165,10 @@ def delete_payment(
         if order:
             order.paid_amount -= payment.amount
     
-    # Reverse supplier payable if outgoing payment
+    # Reverse supplier payable
     if str(payment.type) == "outgoing" and payment.supplier_id:
         supplier = db.query(Supplier).filter(Supplier.id == payment.supplier_id).first()
         if supplier:
-            logger.info(f"Reversing payable for supplier {supplier.id}: {supplier.total_payable} += {payment.amount}")
             supplier.total_payable += payment.amount
     
     db.delete(payment)

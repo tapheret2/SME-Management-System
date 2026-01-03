@@ -46,9 +46,12 @@ def get_dashboard_metrics(
     month_revenue = sum(o.total for o in month_orders) or Decimal("0")
     month_count = month_orders.count()
     
-    # Receivables/Payables
-    total_receivables = db.query(func.coalesce(func.sum(Customer.total_debt), 0)).scalar()
-    total_payables = db.query(func.coalesce(func.sum(Supplier.total_payable), 0)).scalar()
+    # Receivables/Payables (Net totals based on settlement direction)
+    total_receivables = db.query(func.coalesce(func.sum(Customer.total_debt), 0)).filter(Customer.total_debt < 0).scalar()
+    debtor_count = db.query(Customer).filter(Customer.total_debt < 0).count()
+    
+    total_payables = db.query(func.coalesce(func.sum(Supplier.total_payable), 0)).filter(Supplier.total_payable > 0).scalar()
+    creditor_count = db.query(Supplier).filter(Supplier.total_payable > 0).count()
     
     # Counts
     total_customers = db.query(Customer).count()
@@ -63,8 +66,10 @@ def get_dashboard_metrics(
         today_orders=today_count,
         month_revenue=month_revenue,
         month_orders=month_count,
-        total_receivables=Decimal(str(total_receivables)),
-        total_payables=Decimal(str(total_payables)),
+        total_receivables=Decimal(str(total_receivables or 0)),
+        total_payables=Decimal(str(total_payables or 0)),
+        debtor_count=debtor_count,
+        creditor_count=creditor_count,
         total_customers=total_customers,
         total_products=total_products,
         low_stock_count=low_stock

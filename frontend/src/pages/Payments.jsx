@@ -208,7 +208,7 @@ export default function Payments() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
-                                {customersWithDebt?.items?.filter(c => Number(c.total_debt) !== 0).map(item => (
+                                {customersWithDebt?.items?.filter(c => Number(c.total_debt) < 0).map(item => (
                                     <tr key={item.id} className="hover:bg-gray-50">
                                         <td className="table-cell font-medium">{item.code}</td>
                                         <td className="table-cell">{item.name}</td>
@@ -247,7 +247,7 @@ export default function Payments() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
-                                {suppliersWithPayable?.items?.filter(s => Number(s.total_payable) !== 0).map(item => (
+                                {suppliersWithPayable?.items?.filter(s => Number(s.total_payable) > 0).map(item => (
                                     <tr key={item.id} className="hover:bg-gray-50">
                                         <td className="table-cell font-medium">{item.code}</td>
                                         <td className="table-cell">{item.name}</td>

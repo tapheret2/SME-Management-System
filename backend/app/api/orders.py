@@ -158,7 +158,7 @@ def update_order_status(
                 detail=f"Cannot transition from {order.status.value} to {new_status.value}"
             )
         
-        # Handle stock changes
+        # Handle stock changes and debt updates
         if new_status == OrderStatus.CONFIRMED and order.status == OrderStatus.DRAFT:
             # Deduct stock on confirm
             for item in order.line_items:
@@ -182,7 +182,12 @@ def update_order_status(
                     reason=f"Order {order.order_number}"
                 )
                 db.add(movement)
-        
+            
+            # Update Customer Debt (Decrease/Negative for debt creation)
+            customer = db.query(Customer).filter(Customer.id == order.customer_id).first()
+            if customer:
+                customer.total_debt -= order.total
+
         elif new_status == OrderStatus.CANCELLED and order.status == OrderStatus.CONFIRMED:
             # Restore stock on cancel
             for item in order.line_items:
@@ -200,6 +205,11 @@ def update_order_status(
                     reason=f"Cancelled order {order.order_number}"
                 )
                 db.add(movement)
+
+            # Revert Customer Debt (Increase/Back towards zero)
+            customer = db.query(Customer).filter(Customer.id == order.customer_id).first()
+            if customer:
+                customer.total_debt += order.total
         
         order.status = new_status
         
