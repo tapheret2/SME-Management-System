@@ -35,47 +35,67 @@
 
 ## 🛠️ Technology Stack
 
-This system is engineered for stability, security, and horizontal scalability.
-
-### Backend Core
-*   **Python 3.11 & FastAPI**: High-performance asynchronous API framework.
-*   **SQLAlchemy & PostgreSQL 16**: ACID-compliant relational data storage with complex constraint handling.
-*   **Pydantic**: Strict data validation and settings management.
-*   **Gunicorn**: Production-grade process manager.
-
-### Frontend Experience
-*   **React 18**: Component-driven UI architecture.
-*   **TanStack Query**: Enterprise-grade server state management and caching.
-*   **Tailwind CSS**: Modern utility-first design system.
-*   **Nginx**: High-performance reverse proxy and static asset server.
-
-### Infrastructure & DevOps
-*   **Docker & Docker Compose**: Containerized micro-architecture for consistent deployment.
-*   **Security Hardening**: Environment-variable enforcement, strict CORS policies, and non-root container execution.
+*   **Backend**: Python 3.11, FastAPI, SQLAlchemy, PostgreSQL 16
+*   **Frontend**: React 18, TanStack Query, Tailwind CSS
+*   **Infrastructure**: Docker, Nginx, Gunicorn
 
 ---
 
-## 🏗️ System Architecture
+## 📦 Quick Start (Developers)
 
-The system utilizes a 3-tier architecture designed for security and separation of concerns:
+This repository includes a fully functional showcase version.
 
-```mermaid
-graph LR
-    User[Client Browser] -->|HTTPS| Nginx[Nginx Proxy]
-    Nginx -->|Static Assets| React[React App]
-    Nginx -->|API Requests| Gunicorn[Gunicorn Server]
-    Gunicorn -->|ASGI| FastAPI[FastAPI Backend]
-    FastAPI -->|Queries| DB[(PostgreSQL)]
+### Prerequisites
+*   Docker & Docker Compose v2+
+*   Git
+
+### 1. Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/tapheret2/SME-Management-System.git
+cd sme-management
+
+# Configure Environment
+cp .env.example .env
+# Note: The example config is ready for local testing
 ```
 
+### 2. Deployment
+
+You can choose between Development mode (Hot-reload) or Production mode (Demo).
+
+**Option A: Production / Demo Mode (Recommended)**
+Runs on port 80 with Nginx + Gunicorn (Fast & optimized).
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+**Option B: Development Mode**
+Runs on port 5173 with Vite hot-reload.
+
+```bash
+docker compose up -d
+```
+
+### 3. Access
+
+*   **Production URL**: `http://localhost`
+*   **Dev URL**: `http://localhost:5173` (If using Option B)
+*   **API Docs**: `http://localhost:8000/docs`
+
+> **Demo Credentials**:
+> *   Email: `admin@sme.com`
+> *   Password: `Admin123!`
+
 ---
 
-## 📜 Licensing & Usage
+## 📜 Licensing
 
-**This project is a Proprietary Commercial Product.**
+**Proprietary Commercial Software - Portfolio Version**
 
 *   The source code in this repository is for **Portfolio / Demonstration purposes only**.
 *   Unauthorized copying, modification, distribution, or use for commercial purposes is strictly prohibited.
-*   For licensing inquiries or to request a live demo, please contact the author.
 
 Copyright © 2026. All Rights Reserved.
