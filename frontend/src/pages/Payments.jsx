@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { getPayments, createPayment, updatePaymentStatus } from '../api/payments';
+import { getPayments, createPayment, deletePayment, getARAPSummary } from '../api/payments';
 import { toDisplayMessage } from '../utils/toDisplayMessage';
 import { getCustomers } from '../api/customers';
 import { getSuppliers } from '../api/suppliers';
@@ -30,15 +30,23 @@ export default function Payments() {
         enabled: activeTab === 'all',
     });
 
-    const { data: receivablesData } = useQuery({
-        queryKey: ['receivables'],
-        queryFn: getReceivables,
+    const { data: arapData } = useQuery({
+        queryKey: ['ar-ap-summary'],
+        queryFn: getARAPSummary,
+        enabled: activeTab === 'receivables' || activeTab === 'payables',
+    });
+
+    // Get customers with debt for receivables tab
+    const { data: customersWithDebt } = useQuery({
+        queryKey: ['customers-with-debt'],
+        queryFn: () => getCustomers({ size: 100 }),
         enabled: activeTab === 'receivables',
     });
 
-    const { data: payablesData } = useQuery({
-        queryKey: ['payables'],
-        queryFn: getPayables,
+    // Get suppliers with payable for payables tab
+    const { data: suppliersWithPayable } = useQuery({
+        queryKey: ['suppliers-with-payable'],
+        queryFn: () => getSuppliers({ size: 100 }),
         enabled: activeTab === 'payables',
     });
 
@@ -56,10 +64,23 @@ export default function Payments() {
         mutationFn: createPayment,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['payments'] });
-            queryClient.invalidateQueries({ queryKey: ['receivables'] });
-            queryClient.invalidateQueries({ queryKey: ['payables'] });
+            queryClient.invalidateQueries({ queryKey: ['ar-ap-summary'] });
+            queryClient.invalidateQueries({ queryKey: ['customers-with-debt'] });
+            queryClient.invalidateQueries({ queryKey: ['suppliers-with-payable'] });
             toast.success('Tạo phiếu thanh toán thành công!');
             closeModal();
+        },
+        onError: (error) => toast.error(toDisplayMessage(error)),
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: deletePayment,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['payments'] });
+            queryClient.invalidateQueries({ queryKey: ['ar-ap-summary'] });
+            queryClient.invalidateQueries({ queryKey: ['customers-with-debt'] });
+            queryClient.invalidateQueries({ queryKey: ['suppliers-with-payable'] });
+            toast.success('Xóa phiếu thanh toán thành công!');
         },
         onError: (error) => toast.error(toDisplayMessage(error)),
     });
@@ -82,9 +103,9 @@ export default function Payments() {
             notes: data.notes || undefined,
         };
         if (data.type === 'incoming') {
-            payload.customer_id = Number(data.customer_id);
+            payload.customer_id = String(data.customer_id);
         } else {
-            payload.supplier_id = Number(data.supplier_id);
+            payload.supplier_id = String(data.supplier_id);
         }
         createMutation.mutate(payload);
     };
@@ -139,6 +160,7 @@ export default function Payments() {
                                         <th className="table-header text-right">Số tiền</th>
                                         <th className="table-header">PT thanh toán</th>
                                         <th className="table-header">Ngày</th>
+                                        <th className="table-header text-right">Thao tác</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200">
@@ -154,6 +176,12 @@ export default function Payments() {
                                             <td className="table-cell text-right font-medium">{formatVND(payment.amount)}</td>
                                             <td className="table-cell text-gray-500">{methodLabels[payment.method]}</td>
                                             <td className="table-cell text-gray-500">{format(new Date(payment.payment_date), 'dd/MM/yyyy')}</td>
+                                            <td className="table-cell text-right">
+                                                <button
+                                                    onClick={() => { if (confirm('Xác nhận xóa phiếu thanh toán này?')) deleteMutation.mutate(payment.id); }}
+                                                    className="text-red-600 hover:text-red-800"
+                                                >Xóa</button>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -167,7 +195,7 @@ export default function Payments() {
                 <div className="card">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="font-semibold">Công nợ phải thu</h3>
-                        <p className="text-lg font-bold text-red-600">{formatVND(receivablesData?.total_receivables || 0)}</p>
+                        <p className="text-lg font-bold text-red-600">{formatVND(arapData?.total_receivables || 0)}</p>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
@@ -176,14 +204,24 @@ export default function Payments() {
                                     <th className="table-header">Mã KH</th>
                                     <th className="table-header">Tên khách hàng</th>
                                     <th className="table-header text-right">Công nợ</th>
+                                    <th className="table-header text-right">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
-                                {receivablesData?.items?.map(item => (
-                                    <tr key={item.entity_id} className="hover:bg-gray-50">
-                                        <td className="table-cell font-medium">{item.entity_code}</td>
-                                        <td className="table-cell">{item.entity_name}</td>
-                                        <td className="table-cell text-right font-medium text-red-600">{formatVND(item.remaining_amount)}</td>
+                                {customersWithDebt?.items?.filter(c => Number(c.total_debt) !== 0).map(item => (
+                                    <tr key={item.id} className="hover:bg-gray-50">
+                                        <td className="table-cell font-medium">{item.code}</td>
+                                        <td className="table-cell">{item.name}</td>
+                                        <td className="table-cell text-right font-medium text-red-600">{formatVND(item.total_debt)}</td>
+                                        <td className="table-cell text-right">
+                                            <button
+                                                onClick={() => {
+                                                    reset({ type: 'incoming', method: 'cash', amount: Math.abs(item.total_debt), customer_id: item.id, supplier_id: '', notes: '' });
+                                                    setIsModalOpen(true);
+                                                }}
+                                                className="text-green-600 hover:text-green-800 font-medium"
+                                            >Thu tiền</button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -196,7 +234,7 @@ export default function Payments() {
                 <div className="card">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="font-semibold">Công nợ phải trả</h3>
-                        <p className="text-lg font-bold text-orange-600">{formatVND(payablesData?.total_payables || 0)}</p>
+                        <p className="text-lg font-bold text-orange-600">{formatVND(arapData?.total_payables || 0)}</p>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
@@ -205,14 +243,24 @@ export default function Payments() {
                                     <th className="table-header">Mã NCC</th>
                                     <th className="table-header">Tên nhà cung cấp</th>
                                     <th className="table-header text-right">Công nợ</th>
+                                    <th className="table-header text-right">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
-                                {payablesData?.items?.map(item => (
-                                    <tr key={item.entity_id} className="hover:bg-gray-50">
-                                        <td className="table-cell font-medium">{item.entity_code}</td>
-                                        <td className="table-cell">{item.entity_name}</td>
-                                        <td className="table-cell text-right font-medium text-orange-600">{formatVND(item.remaining_amount)}</td>
+                                {suppliersWithPayable?.items?.filter(s => Number(s.total_payable) !== 0).map(item => (
+                                    <tr key={item.id} className="hover:bg-gray-50">
+                                        <td className="table-cell font-medium">{item.code}</td>
+                                        <td className="table-cell">{item.name}</td>
+                                        <td className="table-cell text-right font-medium text-orange-600">{formatVND(item.total_payable)}</td>
+                                        <td className="table-cell text-right">
+                                            <button
+                                                onClick={() => {
+                                                    reset({ type: 'outgoing', method: 'cash', amount: Math.abs(item.total_payable), customer_id: '', supplier_id: item.id, notes: '' });
+                                                    setIsModalOpen(true);
+                                                }}
+                                                className="text-blue-600 hover:text-blue-800 font-medium"
+                                            >Thanh toán</button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -227,7 +275,9 @@ export default function Payments() {
                     <div className="flex min-h-screen items-center justify-center p-4">
                         <div className="fixed inset-0 bg-black/50" onClick={closeModal} />
                         <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-                            <h3 className="text-lg font-semibold mb-4">Tạo phiếu thanh toán</h3>
+                            <h3 className="text-lg font-semibold mb-4">
+                                {paymentType === 'incoming' ? 'Ghi nhận thu tiền' : 'Ghi nhận chi tiền'}
+                            </h3>
                             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                                 <div>
                                     <label className="form-label">Loại *</label>
@@ -275,7 +325,9 @@ export default function Payments() {
                                 </div>
                                 <div className="flex justify-end gap-3 pt-4">
                                     <button type="button" onClick={closeModal} className="btn-secondary">Hủy</button>
-                                    <button type="submit" className="btn-primary" disabled={createMutation.isPending}>Tạo phiếu</button>
+                                    <button type="submit" className="btn-primary" disabled={createMutation.isPending}>
+                                        {paymentType === 'incoming' ? 'Lưu phiếu thu' : 'Lưu phiếu chi'}
+                                    </button>
                                 </div>
                             </form>
                         </div>

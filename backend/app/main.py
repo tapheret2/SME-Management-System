@@ -15,7 +15,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.config import settings
 from app.database import get_db, engine, Base
-from app.api import auth, products, stock, customers, orders, payments, reports, export, audit
+from app.api import auth, products, stock, customers, suppliers, orders, payments, reports, export, audit
 
 logger = logging.getLogger("sme")
 
@@ -69,6 +69,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(products.router, prefix="/api")
 app.include_router(stock.router, prefix="/api")
 app.include_router(customers.router, prefix="/api")
+app.include_router(suppliers.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")

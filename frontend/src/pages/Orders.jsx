@@ -13,12 +13,78 @@ function formatVND(value) {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
 }
 
-// ... statusLabels and statusColors remain ...
+const statusLabels = {
+    draft: 'Nháp',
+    confirmed: 'Đã xác nhận',
+    shipped: 'Đang giao',
+    completed: 'Hoàn thành',
+    cancelled: 'Đã hủy',
+};
+
+const statusColors = {
+    draft: 'badge bg-gray-100 text-gray-800',
+    confirmed: 'badge bg-blue-100 text-blue-800',
+    shipped: 'badge bg-yellow-100 text-yellow-800',
+    completed: 'badge bg-green-100 text-green-800',
+    cancelled: 'badge bg-red-100 text-red-800',
+};
 
 export default function Orders() {
-    // ... state ...
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [statusFilter, setStatusFilter] = useState('');
+    const [page, setPage] = useState(1);
+    const [newOrder, setNewOrder] = useState({ customer_id: '', line_items: [], discount: 0 });
+    const queryClient = useQueryClient();
 
-    // ... queries ...
+    const { data, isLoading } = useQuery({
+        queryKey: ['orders', { status: statusFilter, page }],
+        queryFn: () => getOrders({ status: statusFilter || undefined, page, size: 20 }),
+    });
+
+    const { data: customersData } = useQuery({
+        queryKey: ['customers-select'],
+        queryFn: () => getCustomers({ size: 100 }),
+    });
+
+    const { data: productsData } = useQuery({
+        queryKey: ['products-select'],
+        queryFn: () => getProducts({ size: 100 }),
+    });
+
+    const addLineItem = () => {
+        setNewOrder(prev => ({
+            ...prev,
+            line_items: [...prev.line_items, { product_id: '', quantity: 1, unit_price: 0, discount: 0 }]
+        }));
+    };
+
+    const updateLineItem = (index, field, value) => {
+        setNewOrder(prev => {
+            const newLineItems = prev.line_items.map((item, i) => {
+                if (i !== index) return item;
+
+                const updatedItem = { ...item, [field]: value };
+
+                // Auto-fill unit_price when product changes
+                if (field === 'product_id' && value) {
+                    const selectedProduct = productsData?.items?.find(p => String(p.id) === String(value));
+                    if (selectedProduct) {
+                        updatedItem.unit_price = selectedProduct.sell_price || 0;
+                    }
+                }
+
+                return updatedItem;
+            });
+            return { ...prev, line_items: newLineItems };
+        });
+    };
+
+    const removeLineItem = (index) => {
+        setNewOrder(prev => ({
+            ...prev,
+            line_items: prev.line_items.filter((_, i) => i !== index)
+        }));
+    };
 
     const createMutation = useMutation({
         mutationFn: createOrder,
@@ -46,7 +112,6 @@ export default function Orders() {
         },
     });
 
-    // ... line item helpers ...
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -80,10 +145,10 @@ export default function Orders() {
         }
 
         const payload = {
-            customer_id: Number(cleanedOrder.customer_id),
+            customer_id: String(cleanedOrder.customer_id),
             discount: newOrder.discount === '' ? 0 : Number(newOrder.discount),
             line_items: newOrder.line_items.map(item => ({
-                product_id: Number(item.product_id),
+                product_id: String(item.product_id),
                 quantity: item.quantity === '' ? 0 : Number(item.quantity),
                 unit_price: item.unit_price === '' ? 0 : Number(item.unit_price),
                 discount: item.discount === '' || item.discount === undefined ? 0 : Number(item.discount)
@@ -233,13 +298,9 @@ export default function Orders() {
                                                     placeholder="SL"
                                                     min="1"
                                                 />
-                                                <input
-                                                    type="number"
-                                                    value={item.unit_price}
-                                                    onChange={(e) => updateLineItem(index, 'unit_price', e.target.value)}
-                                                    className="form-input w-32"
-                                                    placeholder="Đơn giá"
-                                                />
+                                                <div className="form-input w-32 bg-gray-100 text-right">
+                                                    {formatVND((item.unit_price || 0) * (Number(item.quantity) || 0))}
+                                                </div>
                                                 <button type="button" onClick={() => removeLineItem(index)} className="text-red-500 hover:text-red-700">✕</button>
                                             </div>
                                         ))}

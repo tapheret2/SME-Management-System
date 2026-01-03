@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 from decimal import Decimal
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -21,6 +22,7 @@ from app.api.deps import get_current_user
 
 
 router = APIRouter(prefix="/payments", tags=["payments"])
+logger = logging.getLogger("sme")
 
 
 def generate_payment_number() -> str:
@@ -86,7 +88,7 @@ def create_payment(
     if data.type == "incoming" and data.customer_id:
         customer = db.query(Customer).filter(Customer.id == data.customer_id).first()
         if customer:
-            customer.total_debt -= data.amount
+            customer.total_debt += data.amount  # Add to reduce negative debt
     
     # Update order paid_amount if linked
     if data.order_id:
@@ -98,7 +100,7 @@ def create_payment(
     if data.type == "outgoing" and data.supplier_id:
         supplier = db.query(Supplier).filter(Supplier.id == data.supplier_id).first()
         if supplier:
-            supplier.total_payable -= data.amount
+            supplier.total_payable -= data.amount  # Subtract to reduce positive payable
     
     db.commit()
     db.refresh(payment)
@@ -111,11 +113,11 @@ def get_arap_summary(
     _current_user = Depends(get_current_user)
 ):
     """Get accounts receivable/payable summary."""
-    # Total receivables (customer debts)
+    # Total receivables (customer debts - negative)
     receivables = db.query(func.coalesce(func.sum(Customer.total_debt), 0)).scalar()
-    customer_count = db.query(Customer).filter(Customer.total_debt > 0).count()
+    customer_count = db.query(Customer).filter(Customer.total_debt < 0).count()
     
-    # Total payables (supplier debts)
+    # Total payables (supplier debts - positive)
     payables = db.query(func.coalesce(func.sum(Supplier.total_payable), 0)).scalar()
     supplier_count = db.query(Supplier).filter(Supplier.total_payable > 0).count()
     
@@ -138,3 +140,39 @@ def get_payment(
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
     return payment
+
+
+@router.delete("/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_payment(
+    payment_id: UUID,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Delete a payment and reverse debt/payable changes."""
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    # Reverse customer debt if incoming payment
+    if str(payment.type) == "incoming" and payment.customer_id:
+        customer = db.query(Customer).filter(Customer.id == payment.customer_id).first()
+        if customer:
+            logger.info(f"Reversing debt for customer {customer.id}: {customer.total_debt} -= {payment.amount}")
+            customer.total_debt -= payment.amount
+    
+    # Reverse order paid_amount if linked
+    if payment.order_id:
+        order = db.query(SalesOrder).filter(SalesOrder.id == payment.order_id).first()
+        if order:
+            order.paid_amount -= payment.amount
+    
+    # Reverse supplier payable if outgoing payment
+    if str(payment.type) == "outgoing" and payment.supplier_id:
+        supplier = db.query(Supplier).filter(Supplier.id == payment.supplier_id).first()
+        if supplier:
+            logger.info(f"Reversing payable for supplier {supplier.id}: {supplier.total_payable} += {payment.amount}")
+            supplier.total_payable += payment.amount
+    
+    db.delete(payment)
+    db.commit()
+    return None

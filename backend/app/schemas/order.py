@@ -46,7 +46,9 @@ class OrderResponse(BaseModel):
     id: UUID
     order_number: str
     customer_id: UUID
+    customer_name: Optional[str] = None
     created_by: UUID
+    creator_name: Optional[str] = None
     status: str
     subtotal: Decimal
     discount: Decimal

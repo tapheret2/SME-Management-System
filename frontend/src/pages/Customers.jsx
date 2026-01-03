@@ -28,6 +28,7 @@ export default function Customers() {
         mutationFn: createCustomer,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['customers'] });
+            queryClient.invalidateQueries({ queryKey: ['customers-select'] });
             toast.success('Tạo khách hàng thành công!');
             closeModal();
         },

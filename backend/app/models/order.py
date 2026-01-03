@@ -44,6 +44,8 @@ class SalesOrder(Base, UUIDMixin, TimestampMixin):
     
     # Relationships
     line_items = relationship("SalesOrderItem", back_populates="order", cascade="all, delete-orphan")
+    customer = relationship("Customer")
+    creator = relationship("User")
     
     __table_args__ = (
         Index("idx_sales_orders_order_date", "order_date"),
@@ -54,6 +56,14 @@ class SalesOrder(Base, UUIDMixin, TimestampMixin):
     @property
     def remaining_amount(self) -> Decimal:
         return self.total - self.paid_amount
+
+    @property
+    def customer_name(self) -> str:
+        return self.customer.name if self.customer else "Unknown"
+
+    @property
+    def creator_name(self) -> str:
+        return self.creator.full_name if self.creator else "Unknown"
     
     def can_transition_to(self, new_status: OrderStatus) -> bool:
         return new_status in STATUS_TRANSITIONS.get(self.status, [])

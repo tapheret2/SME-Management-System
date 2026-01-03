@@ -1,151 +1,113 @@
-from fastapi import APIRouter, HTTPException, status, Query
+"""Suppliers API endpoints."""
 from typing import Optional
+from uuid import UUID
 
-from app.api.deps import DBSession, CurrentUser
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.orm import Session
+from sqlalchemy import or_
+
+from app.database import get_db
 from app.models.supplier import Supplier
 from app.schemas.supplier import SupplierCreate, SupplierUpdate, SupplierResponse, SupplierListResponse
-from app.services.audit import log_create, log_update, log_delete
+from app.api.deps import get_current_user
 
-router = APIRouter(prefix="/suppliers", tags=["Suppliers"])
+
+router = APIRouter(prefix="/suppliers", tags=["suppliers"])
 
 
 @router.get("", response_model=SupplierListResponse)
-async def list_suppliers(
-    db: DBSession,
-    current_user: CurrentUser,
+def list_suppliers(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
 ):
-    """
-    List all suppliers with pagination and search.
-    """
+    """List suppliers with pagination."""
     query = db.query(Supplier)
     
     if search:
         search_pattern = f"%{search}%"
         query = query.filter(
-            (Supplier.name.ilike(search_pattern)) |
-            (Supplier.code.ilike(search_pattern)) |
-            (Supplier.phone.ilike(search_pattern))
+            or_(
+                Supplier.code.ilike(search_pattern),
+                Supplier.name.ilike(search_pattern),
+                Supplier.phone.ilike(search_pattern)
+            )
         )
     
     total = query.count()
-    items = query.order_by(Supplier.created_at.desc()).offset((page - 1) * size).limit(size).all()
-    
-    return SupplierListResponse(items=items, total=total, page=page, size=size)
+    items = query.offset((page - 1) * size).limit(size).all()
+    return SupplierListResponse(items=items, total=total)
 
 
 @router.post("", response_model=SupplierResponse, status_code=status.HTTP_201_CREATED)
-async def create_supplier(request: SupplierCreate, db: DBSession, current_user: CurrentUser):
-    """
-    Create a new supplier.
-    """
-    # Check if code already exists
-    existing = db.query(Supplier).filter(Supplier.code == request.code).first()
+def create_supplier(
+    data: SupplierCreate,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Create a new supplier."""
+    existing = db.query(Supplier).filter(Supplier.code == data.code).first()
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Supplier code already exists"
-        )
+        raise HTTPException(status_code=400, detail="Supplier code already exists")
     
-    supplier = Supplier(**request.model_dump())
+    supplier = Supplier(**data.model_dump())
     db.add(supplier)
     db.commit()
     db.refresh(supplier)
-    
-    # Audit log
-    log_create(db, current_user.id, "supplier", supplier.id, request.model_dump())
-    
     return supplier
 
 
 @router.get("/{supplier_id}", response_model=SupplierResponse)
-async def get_supplier(supplier_id: int, db: DBSession, current_user: CurrentUser):
-    """
-    Get a specific supplier by ID.
-    """
+def get_supplier(
+    supplier_id: UUID,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Get a single supplier."""
     supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
     if not supplier:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Supplier not found"
-        )
+        raise HTTPException(status_code=404, detail="Supplier not found")
     return supplier
 
 
 @router.put("/{supplier_id}", response_model=SupplierResponse)
-async def update_supplier(supplier_id: int, request: SupplierUpdate, db: DBSession, current_user: CurrentUser):
-    """
-    Update a supplier.
-    """
+def update_supplier(
+    supplier_id: UUID,
+    data: SupplierUpdate,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Update a supplier."""
     supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
     if not supplier:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Supplier not found"
-        )
+        raise HTTPException(status_code=404, detail="Supplier not found")
     
-    old_values = {
-        "code": supplier.code,
-        "name": supplier.name,
-        "phone": supplier.phone,
-        "email": supplier.email,
-        "address": supplier.address,
-        "notes": supplier.notes
-    }
-    
-    # Check if new code is taken
-    if request.code is not None and request.code != supplier.code:
-        existing = db.query(Supplier).filter(Supplier.code == request.code).first()
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Supplier code already exists"
-            )
-    
-    # Update fields
-    update_data = request.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(supplier, field, value)
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(supplier, key, value)
     
     db.commit()
     db.refresh(supplier)
-    
-    # Audit log
-    log_update(db, current_user.id, "supplier", supplier.id, old_values, update_data)
-    
     return supplier
 
 
-@router.delete("/{supplier_id}")
-async def delete_supplier(supplier_id: int, db: DBSession, current_user: CurrentUser):
-    """
-    Delete a supplier.
-    """
+@router.delete("/{supplier_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_supplier(
+    supplier_id: UUID,
+    db: Session = Depends(get_db),
+    _current_user = Depends(get_current_user)
+):
+    """Delete a supplier."""
     supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
     if not supplier:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Supplier not found"
-        )
+        raise HTTPException(status_code=404, detail="Supplier not found")
     
-    # Check if supplier has stock movements
+    # Check for existing stock movements before delete
     if supplier.stock_movements:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete supplier with existing stock movements"
-        )
-    
-    old_values = {
-        "code": supplier.code,
-        "name": supplier.name
-    }
+        raise HTTPException(status_code=400, detail="Cannot delete supplier with existing stock movements")
     
     db.delete(supplier)
     db.commit()
-    
-    # Audit log
-    log_delete(db, current_user.id, "supplier", supplier_id, old_values)
-    
-    return {"message": "Supplier deleted successfully"}
+    return None

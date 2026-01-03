@@ -25,12 +25,7 @@ export const deletePayment = async (id) => {
     return response.data;
 };
 
-export const getReceivables = async () => {
-    const response = await api.get('/payments/receivables');
-    return response.data;
-};
-
-export const getPayables = async () => {
-    const response = await api.get('/payments/payables');
+export const getARAPSummary = async () => {
+    const response = await api.get('/payments/ar-ap');
     return response.data;
 };

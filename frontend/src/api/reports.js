@@ -21,7 +21,7 @@ export const getInventoryValuation = async () => {
 };
 
 export const getARAPSummary = async () => {
-    const response = await api.get('/reports/ar-ap-summary');
+    const response = await api.get('/payments/ar-ap');
     return response.data;
 };
 

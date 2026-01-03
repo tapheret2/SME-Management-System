@@ -63,12 +63,12 @@ export default function Inventory() {
     const handleSubmit = (e) => {
         e.preventDefault();
         const payload = {
-            product_id: Number(formData.product_id),
+            product_id: String(formData.product_id),
             quantity: Number(formData.quantity),
             reason: formData.reason || undefined,
         };
         if (modalType === 'in' && formData.supplier_id) {
-            payload.supplier_id = Number(formData.supplier_id);
+            payload.supplier_id = String(formData.supplier_id);
         }
         stockMutation.mutate(payload);
     };

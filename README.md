@@ -1,233 +1,117 @@
-# SME Management System
+# Peganyx SME Management System™
 
-> Complete inventory, orders, and payment management for small & medium enterprises.
+[![Release](https://img.shields.io/badge/release-v1.0.0-blue.svg)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-Commercial-purple.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/status-Production%20Ready-green.svg)]()
 
-![Dashboard Screenshot](docs/screenshots/dashboard.png)
-*Screenshot: Dashboard with real-time KPIs*
+> **Enterprise-grade operations management for modern businesses.**  
+> Streamline inventory, automate orders, and gain financial clarity in one powerful, self-hosted platform.
+
+![Dashboard](docs/screenshots/dashboard.png)
 
 ---
 
-## 🎯 Features
+## 🚀 Why Peganyx?
+
+Managing a growing business with spreadsheets is a recipe for disaster. Stock discrepancies, lost orders, and untracked payments bleed revenue. 
+
+**Peganyx SME System** solves this by providing a unified command center for your entire operation:
+
+*   **Inventory Control**: Real-time tracking with low-stock alerts and audit trails.
+*   **Order Automation**: Seamless workflow from Draft → Confirmed → Shipped → Delivered.
+*   **Financial Clarity**: Track who owes you (AR) and who you owe (AP) instantly.
+*   **Data Sovereignty**: Self-hosted on your infrastructure. Your data, your rules.
+
+---
+
+## ⚡ Key Features
 
 | Module | Capabilities |
 |--------|-------------|
-| **Products** | SKU management, categories, cost/sell pricing, low-stock alerts |
-| **Inventory** | Stock in/out/adjust movements, audit trail |
-| **Orders** | Draft → Confirmed → Shipped → Completed workflow, auto stock deduction |
-| **Payments** | Incoming (AR) and outgoing (AP), order linking |
-| **Reports** | Dashboard KPIs, revenue charts, top products |
-| **Export** | CSV export for products, orders, payments |
-| **Audit** | Full action log with before/after snapshots |
-| **Security** | JWT authentication, role-based access (Admin/Manager/Staff) |
+| **📦 Products** | Advanced SKU management, tiered pricing, and instant stock visibility. |
+| **🛒 Orders** | Frictionless order processing with automatic inventory deduction and status tracking. |
+| **💰 Payments** | Granular AR/AP tracking. Link payments to specific orders. |
+| **📊 Reports** | C-level dashboards, revenue charts, and actionable business intelligence. |
+| **🔒 Security** | Role-Based Access Control (RBAC), JWT authentication, and comprehensive audit logging. |
+| **🌍 Localization** | Built for Vietnam market (VND currency, local formats) + International support. |
 
 ---
 
-## 📸 Screenshots
+## 🛠️ Tech Stack & Architecture
 
-| Dashboard | Orders | Products |
-|-----------|--------|----------|
-| ![Dashboard](docs/screenshots/dashboard_thumb.png) | ![Orders](docs/screenshots/orders_thumb.png) | ![Products](docs/screenshots/products_thumb.png) |
+Built on a battle-tested, high-performance stack designed for stability and scale:
+
+*   **Backend**: Python 3.11, FastAPI (High-performance Async API), SQLAlchemy
+*   **Frontend**: React 18, TanStack Query, Tailwind CSS (Modern, responsive UI)
+*   **Database**: PostgreSQL 16 (Reliable, ACID-compliant data storage)
+*   **Infrastructure**: Docker & Docker Compose (Containerized deployment)
 
 ---
 
-## 🚀 Quick Start
+## 📦 Quick Start (Production)
 
 ### Prerequisites
-- Docker & Docker Compose
-- Git
+*   Docker Engine & Docker Compose v2+
+*   Git
 
-### Installation
+### 1. Installation
 
 ```bash
-# Clone repository
-git clone https://github.com/your-org/sme-management.git
+# Clone the repository
+git clone https://github.com/peganyx/sme-management.git
 cd sme-management
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your settings (especially JWT_SECRET_KEY for production)
-
-# Start services
-docker compose up -d
-
-# Load demo data (optional)
-docker compose exec api python -m app.demo_data
-
-# Access the application
-open http://localhost:5173  # Frontend
-open http://localhost:8000/docs  # API Documentation
+# Configure Environment
+cp backend/.env.example .env
+# IMPORTANT: Edit .env and set a secure JWT_SECRET_KEY
 ```
 
-### Demo Accounts
-
-| Role | Email | Password |
-|------|-------|----------|
-| Admin | admin@sme.com | Admin123! |
-| Manager | manager@sme.com | Manager123! |
-| Staff | staff@sme.com | Staff123! |
-
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Frontend  │────▶│   Backend   │────▶│  PostgreSQL │
-│  (React)    │     │  (FastAPI)  │     │  Database   │
-│  Port 5173  │     │  Port 8000  │     │  Port 5432  │
-└─────────────┘     └─────────────┘     └─────────────┘
-```
-
-### Tech Stack
-- **Backend**: Python 3.11, FastAPI, SQLAlchemy, Pydantic
-- **Frontend**: React, TanStack Query, Tailwind CSS
-- **Database**: PostgreSQL 16
-- **Auth**: JWT with refresh tokens
-- **Container**: Docker Compose
-
----
-
-## 📋 API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/login` | Authenticate user |
-| GET | `/api/products` | List products |
-| POST | `/api/orders` | Create order |
-| PUT | `/api/orders/{id}/status` | Update order status |
-| GET | `/api/reports/dashboard` | Dashboard metrics |
-| GET | `/api/export/products.csv` | Export products |
-| GET | `/api/audit` | Audit logs (admin) |
-
-Full documentation at: `http://localhost:8000/docs`
-
----
-
-## 🔐 Role-Based Access
-
-| Feature | Admin | Manager | Staff |
-|---------|:-----:|:-------:|:-----:|
-| View Dashboard | ✅ | ✅ | ✅ |
-| Manage Products | ✅ | ✅ | ✅ |
-| Create Orders | ✅ | ✅ | ✅ |
-| View Reports | ✅ | ✅ | ❌ |
-| Export Data | ✅ | ✅ | ❌ |
-| Manage Users | ✅ | ❌ | ❌ |
-| View Audit Logs | ✅ | ❌ | ❌ |
-
-### Frontend Role-Based UI Hiding
-
-The frontend should conditionally render UI elements based on user role:
-
-```javascript
-// Example: Hide admin-only features
-{user.role === 'admin' && <AuditLogLink />}
-{['admin', 'manager'].includes(user.role) && <ReportsMenu />}
-```
-
----
-
-## 💾 Database Backup
-
-### Manual Backup
-```bash
-docker compose exec db pg_dump -U sme_user sme_db > backup_$(date +%Y%m%d).sql
-```
-
-### Restore
-```bash
-cat backup_20260103.sql | docker compose exec -T db psql -U sme_user sme_db
-```
-
-### Automated Backups (Recommended)
-Set up a cron job for daily backups:
-```bash
-0 2 * * * cd /path/to/project && docker compose exec -T db pg_dump -U sme_user sme_db | gzip > /backups/sme_$(date +\%Y\%m\%d).sql.gz
-```
-
----
-
-## 🧪 Testing
+### 2. Deployment
 
 ```bash
-# Run all tests
-docker compose exec api pytest tests/ -v
+# Build and start services in production mode
+docker compose up -d --build
 
-# Run specific milestone tests
-docker compose exec api pytest tests/test_milestone1.py -v
-
-# Test coverage
-docker compose exec api pytest tests/ --cov=app --cov-report=html
+# Verify status
+docker compose ps
 ```
 
-**Current status**: 38 tests passing
+### 3. Access
+
+*   **Application**: `http://localhost:5173` (or your domain)
+*   **API Docs**: `http://localhost:8000/docs`
 
 ---
 
-## 📦 Deployment
+## 🔐 Default Credentials
 
-### Production Checklist
-- [ ] Set `DEBUG=false` in `.env`
-- [ ] Generate secure `JWT_SECRET_KEY` (min 32 chars)
-- [ ] Configure proper `CORS_ORIGINS`
-- [ ] Set up SSL/HTTPS (nginx reverse proxy)
-- [ ] Configure database backups
-- [ ] Set up monitoring/alerting
+> **WARNING**: Change these credentials immediately after first login.
 
-### Docker Production Build
-```bash
-docker compose -f docker-compose.prod.yml up -d
-```
+| Role | Email | Password | Access Level |
+|------|-------|----------|--------------|
+| **Administrator** | `admin@sme.com` | `Admin123!` | Full System Access |
+| **Manager** | `manager@sme.com` | `Manager123!` | Operations & Reports |
+| **Staff** | `staff@sme.com` | `Staff123!` | Orders & Basic Tasks |
 
 ---
 
-## 💼 Sales Pitch
+## 📜 License
 
-### Pain Points Solved
+**Proprietary Commercial Software**
 
-❌ **Before**: Messy Excel spreadsheets, lost orders, manual stock counts, no visibility into profits
-
-✅ **After**: Real-time inventory, automated order workflow, instant reports, complete audit trail
-
-### Why Choose SME Management System?
-
-| Problem | Solution |
-|---------|----------|
-| Stock discrepancies | Automatic deduction on order confirmation |
-| Lost payment records | Linked payments with AR/AP tracking |
-| No order history | Complete order lifecycle with audit log |
-| Manual reporting | One-click dashboard & CSV exports |
-| Access control | Role-based permissions (Admin/Manager/Staff) |
-
-### Key Features
-- ✅ **Order Workflow**: Draft → Confirm → Ship → Complete with auto stock updates
-- ✅ **Low Stock Alerts**: Never run out of bestsellers
-- ✅ **Payment Tracking**: Know exactly who owes what
-- ✅ **Audit Trail**: Full history of every change
-- ✅ **CSV Export**: Easy data for accountants
-- ✅ **Multi-user**: Team collaboration with role-based access
-- ✅ **Vietnamese-ready**: Supports VND currency, Vietnamese text
-
-### Pricing Suggestion
-
-| Package | Price | Includes |
-|---------|-------|----------|
-| **Setup Fee** | $500 - $1,000 | Installation, configuration, training, 1-month support |
-| **Monthly Maintenance** | $50 - $100/month | Bug fixes, minor updates, email support |
-| **Custom Development** | $30 - $50/hour | New features, integrations, customizations |
-
-*For 1-3 users, simple deployment. Scale pricing for more users or advanced features.*
+Copyright © 2026 Peganyx, Inc. All rights reserved.  
+Unauthorized copying of this file, via any medium is strictly prohibited.  
+See [LICENSE](LICENSE) for terms.
 
 ---
 
-## 📄 License
+## 🤝 Support & Contact
 
-MIT License - see [LICENSE](LICENSE) for details.
+Need help or customization?
+
+*   **Enterprise Support**: [support@peganyx.com](mailto:support@peganyx.com)
+*   **Sales Inquiry**: [sales@peganyx.com](mailto:sales@peganyx.com)
+*   **Website**: [www.peganyx.com](https://www.peganyx.com)
 
 ---
-
-## 🤝 Support
-
-- 📧 Email: support@yourcompany.com
-- 📖 Documentation: [docs/](docs/)
-- 🐛 Issues: [GitHub Issues](https://github.com/your-org/sme-management/issues)
+*Built with ❤️ by the Peganyx Engineering Team.*

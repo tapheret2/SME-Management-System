@@ -1,0 +1,32 @@
+POSTGRES_PASSWORD=sme_password
+# Environment Configuration
+# Copy this file to .env and update values
+
+# ======================
+# Application Settings
+# ======================
+APP_NAME=SME Management System
+DEBUG=true
+
+# ======================
+# Database Settings
+# ======================
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=sme_db
+POSTGRES_USER=sme_user
+POSTGRES_PASSWORD=sme_password
+
+# ======================
+# Authentication (JWT)
+# ======================
+# Generate with: openssl rand -hex 32
+JWT_SECRET_KEY=your_very_secure_secret_key_here
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+REFRESH_TOKEN_EXPIRE_DAYS=7
+
+# ======================
+# CORS (comma-separated)
+# ======================
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
