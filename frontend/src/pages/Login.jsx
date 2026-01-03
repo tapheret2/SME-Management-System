@@ -98,7 +98,7 @@ export default function Login() {
 
                     <div className="mt-6 text-center text-sm text-gray-500">
                         <p>Demo accounts:</p>
-                        <p className="mt-1">admin@sme.local / Admin123!</p>
+                        <p className="mt-1">admin@sme.com / Admin123!</p>
                     </div>
                 </div>
             </div>
