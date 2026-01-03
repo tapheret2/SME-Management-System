@@ -1,4 +1,4 @@
-# Peganyx SME Management System™
+# SME Management System
 
 [![Release](https://img.shields.io/badge/release-v1.0.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Commercial-purple.svg)](LICENSE)
@@ -15,7 +15,7 @@
 
 Managing a growing business with spreadsheets is a recipe for disaster. Stock discrepancies, lost orders, and untracked payments bleed revenue. 
 
-**Peganyx SME System** solves this by providing a unified command center for your entire operation:
+**SME Management System** solves this by providing a unified command center for your entire operation:
 
 *   **Inventory Control**: Real-time tracking with low-stock alerts and audit trails.
 *   **Order Automation**: Seamless workflow from Draft → Confirmed → Shipped → Delivered.
@@ -58,7 +58,7 @@ Built on a battle-tested, high-performance stack designed for stability and scal
 
 ```bash
 # Clone the repository
-git clone https://github.com/peganyx/sme-management.git
+git clone https://github.com/tapheret2/SME-Management-System.git
 cd sme-management
 
 # Configure Environment
@@ -99,19 +99,13 @@ docker compose ps
 
 **Proprietary Commercial Software**
 
-Copyright © 2026 Peganyx, Inc. All rights reserved.  
+Copyright © 2026. All rights reserved.  
 Unauthorized copying of this file, via any medium is strictly prohibited.  
 See [LICENSE](LICENSE) for terms.
 
 ---
 
-## 🤝 Support & Contact
-
 Need help or customization?
 
-*   **Enterprise Support**: [support@peganyx.com](mailto:support@peganyx.com)
-*   **Sales Inquiry**: [sales@peganyx.com](mailto:sales@peganyx.com)
-*   **Website**: [www.peganyx.com](https://www.peganyx.com)
-
 ---
-*Built with ❤️ by the Peganyx Engineering Team.*
+*Built with ❤️.*
