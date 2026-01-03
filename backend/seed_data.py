@@ -20,10 +20,10 @@ def seed():
     print("🌱 Seeding data...")
 
     # 1. Users
-    if not db.query(User).filter(User.email == "admin@demo.local").first():
+    if not db.query(User).filter(User.email == "admin@sme.com").first():
         admin = User(
             id=uuid4(),
-            email="admin@demo.local",
+            email="admin@sme.com",
             hashed_password=hash_password("DemoAdmin123!"),
             full_name="Demo Admin",
             role=UserRole.ADMIN,

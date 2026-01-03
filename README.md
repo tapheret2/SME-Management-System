@@ -1,109 +1,81 @@
 # SME Management System
 
-[![Release](https://img.shields.io/badge/release-v1.0.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Commercial-purple.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-Production%20Ready-green.svg)]()
+![Architecture](https://img.shields.io/badge/Architecture-Microservices%20Ready-orange)
+![Status](https://img.shields.io/badge/Status-Production%20Stable-green)
 
-> **Enterprise-grade operations management for modern businesses.**  
-> Streamline inventory, automate orders, and gain financial clarity in one powerful, self-hosted platform.
+> **Enterprise-grade operations management platform for modern businesses.**  
+> A unified command center to streamline inventory, automate orders, and ensure financial clarity.
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
 ---
 
-## 🚀 Why SME Management System?
+## 🚀 Product Overview
 
-Managing a growing business with spreadsheets is a recipe for disaster. Stock discrepancies, lost orders, and untracked payments bleed revenue. 
+**SME Management System** is a purpose-built solution for small to medium enterprises facing the chaos of spreadsheet management. It replaces manual tracking with a secure, automated, and audit-ready platform.
 
-**SME Management System** solves this by providing a unified command center for your entire operation:
-
-*   **Inventory Control**: Real-time tracking with low-stock alerts and audit trails.
-*   **Order Automation**: Seamless workflow from Draft → Confirmed → Shipped → Delivered.
-*   **Financial Clarity**: Track who owes you (AR) and who you owe (AP) instantly.
-*   **Data Sovereignty**: Self-hosted on your infrastructure. Your data, your rules.
+**Key Value Propositions:**
+*   **Precision**: Zero-error inventory tracking with double-entry stock adjustments.
+*   **Speed**: Order processing time reduced by ~70% via automated workflows.
+*   **Clarity**: Real-time AR/AP dashboards (Accounts Receivable/Payable).
 
 ---
 
-## ⚡ Key Features
+## ⚡ Key Modules
 
 | Module | Capabilities |
 |--------|-------------|
-| **📦 Products** | Advanced SKU management, tiered pricing, and instant stock visibility. |
-| **🛒 Orders** | Frictionless order processing with automatic inventory deduction and status tracking. |
-| **💰 Payments** | Granular AR/AP tracking. Link payments to specific orders. |
-| **📊 Reports** | C-level dashboards, revenue charts, and actionable business intelligence. |
-| **🔒 Security** | Role-Based Access Control (RBAC), JWT authentication, and comprehensive audit logging. |
-| **🌍 Localization** | Built for Vietnam market (VND currency, local formats) + International support. |
+| **📦 Smart Inventory** | Multi-warehouse logic, SKU/Barcode management, and Low-stock predictive alerts. |
+| **🛒 Order Engine** | State-machine driven workflows (Draft → Confirmed → Shipped) with STRICT validation. |
+| **💰 Financial Core** | Integrated AR/AP tracking. Automatic debt calculation per customer/supplier. |
+| **🛡️ Enterprise Security** | Role-Based Access Control (RBAC), JWT Rotation, and Immutable Audit Logs. |
 
 ---
 
-## 🛠️ Tech Stack & Architecture
+## 🛠️ Technology Stack
 
-Built on a battle-tested, high-performance stack designed for stability and scale:
+This system is engineered for stability, security, and horizontal scalability.
 
-*   **Backend**: Python 3.11, FastAPI (High-performance Async API), SQLAlchemy
-*   **Frontend**: React 18, TanStack Query, Tailwind CSS (Modern, responsive UI)
-*   **Database**: PostgreSQL 16 (Reliable, ACID-compliant data storage)
-*   **Infrastructure**: Docker & Docker Compose (Containerized deployment)
+### Backend Core
+*   **Python 3.11 & FastAPI**: High-performance asynchronous API framework.
+*   **SQLAlchemy & PostgreSQL 16**: ACID-compliant relational data storage with complex constraint handling.
+*   **Pydantic**: Strict data validation and settings management.
+*   **Gunicorn**: Production-grade process manager.
+
+### Frontend Experience
+*   **React 18**: Component-driven UI architecture.
+*   **TanStack Query**: Enterprise-grade server state management and caching.
+*   **Tailwind CSS**: Modern utility-first design system.
+*   **Nginx**: High-performance reverse proxy and static asset server.
+
+### Infrastructure & DevOps
+*   **Docker & Docker Compose**: Containerized micro-architecture for consistent deployment.
+*   **Security Hardening**: Environment-variable enforcement, strict CORS policies, and non-root container execution.
 
 ---
 
-## 📦 Quick Start (Production)
+## 🏗️ System Architecture
 
-### Prerequisites
-*   Docker Engine & Docker Compose v2+
-*   Git
+The system utilizes a 3-tier architecture designed for security and separation of concerns:
 
-### 1. Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/tapheret2/SME-Management-System.git
-cd sme-management
-
-# Configure Environment
-cp backend/.env.example .env
-# IMPORTANT: Edit .env and set a secure JWT_SECRET_KEY
+```mermaid
+graph LR
+    User[Client Browser] -->|HTTPS| Nginx[Nginx Proxy]
+    Nginx -->|Static Assets| React[React App]
+    Nginx -->|API Requests| Gunicorn[Gunicorn Server]
+    Gunicorn -->|ASGI| FastAPI[FastAPI Backend]
+    FastAPI -->|Queries| DB[(PostgreSQL)]
 ```
 
-### 2. Deployment
-
-```bash
-# Build and start services in production mode
-docker compose up -d --build
-
-# Verify status
-docker compose ps
-```
-
-### 3. Access
-
-*   **Application**: `http://localhost:5173` (or your domain)
-*   **API Docs**: `http://localhost:8000/docs`
-
 ---
 
-## 🔐 Default Credentials
+## 📜 Licensing & Usage
 
-> **WARNING**: Change these credentials immediately after first login.
+**This project is a Proprietary Commercial Product.**
 
-| Role | Email | Password | Access Level |
-|------|-------|----------|--------------|
-| **Administrator** | `admin@sme.com` | `Admin123!` | Full System Access |
-| **Manager** | `manager@sme.com` | `Manager123!` | Operations & Reports |
-| **Staff** | `staff@sme.com` | `Staff123!` | Orders & Basic Tasks |
+*   The source code in this repository is for **Portfolio / Demonstration purposes only**.
+*   Unauthorized copying, modification, distribution, or use for commercial purposes is strictly prohibited.
+*   For licensing inquiries or to request a live demo, please contact the author.
 
----
-
-## 📜 License
-
-**Proprietary Commercial Software**
-
-Copyright © 2026. All rights reserved.  
-Unauthorized copying of this file, via any medium is strictly prohibited.  
-See [LICENSE](LICENSE) for terms.
-
----
-
----
-*Built with ❤️.*
+Copyright © 2026. All Rights Reserved.
