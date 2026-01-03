@@ -93,9 +93,11 @@ docker compose up -d
 
 ## 📜 Licensing
 
-**Proprietary Commercial Software - Portfolio Version**
+This project is released under a **Proprietary / Commercial License**.
 
-*   The source code in this repository is for **Portfolio / Demonstration purposes only**.
-*   Unauthorized copying, modification, distribution, or use for commercial purposes is strictly prohibited.
+The source code is provided for demonstration and evaluation purposes only.
+Any form of copying, modification, redistribution, or commercial use
+without explicit authorization is prohibited.
+
 
 Copyright © 2026. All Rights Reserved.
